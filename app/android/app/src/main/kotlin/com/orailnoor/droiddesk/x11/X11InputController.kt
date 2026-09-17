@@ -63,11 +63,22 @@ class X11InputController(private val lorieView: LorieView) {
     companion object {
         const val DISPLAY_SCALE_PERCENT = 200
 
+        fun getOptimalScalePercent(): Int {
+            val model = Build.MODEL.lowercase()
+            return if (model.contains("pixel 10 pro xl")) {
+                200
+            } else if (model.contains("pixel 10")) {
+                180
+            } else {
+                DISPLAY_SCALE_PERCENT
+            }
+        }
+
         /** Must run before LorieView is measured so Xwayland starts at the scaled resolution. */
-        fun configureDisplayScale() {
+        fun configureDisplayScale(customScale: Int = getOptimalScalePercent()) {
             MainActivity.getPrefs().apply {
                 displayResolutionMode.put("scaled")
-                displayScale.put(DISPLAY_SCALE_PERCENT)
+                displayScale.put(customScale)
                 displayStretch.put(true)
                 scaleTouchpad.put(true)
             }

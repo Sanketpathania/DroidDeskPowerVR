@@ -109,10 +109,21 @@ class ChrootRuntime(private val context: Context) {
                 export XDG_DATA_DIRS=/usr/share:/usr/local/share
                 export XDG_CONFIG_DIRS=/etc/xdg
 
-                # Conservative Mesa fallback that works across GPU vendors
-                export LIBGL_ALWAYS_SOFTWARE=true
-                export GALLIUM_DRIVER=llvmpipe
-                export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+                # Graphics environment: PowerVR / Zink acceleration with Tensor G5 multi-core llvmpipe fallback
+                if [ -e "/dev/pvrsrvkm" ] || [ -e "/dev/pvr_sync" ] || [ -d "/dev/dri" ]; then
+                    export GALLIUM_DRIVER=zink
+                    export MESA_LOADER_DRIVER_OVERRIDE=zink
+                    export ZINK_DESCRIPTORS=lazy
+                    export MESA_VK_WSI_PRESENT_MODE=immediate
+                    export MESA_NO_ERROR=1
+                    export PVR_MESA=1
+                    export LP_NUM_THREADS=8
+                else
+                    export LIBGL_ALWAYS_SOFTWARE=true
+                    export GALLIUM_DRIVER=llvmpipe
+                    export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+                    export LP_NUM_THREADS=8
+                fi
 
                 # Disable accessibility bus spam
                 export NO_AT_BRIDGE=1

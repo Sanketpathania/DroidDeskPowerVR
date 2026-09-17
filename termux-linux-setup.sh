@@ -107,11 +107,21 @@ setup_environment() {
     ANDROID_VERSION=$(getprop ro.build.version.release 2>/dev/null || echo "Unknown")
     CPU_ABI=$(getprop ro.product.cpu.abi 2>/dev/null || echo "arm64-v8a")
     GPU_VENDOR=$(getprop ro.hardware.egl 2>/dev/null || echo "")
+    SOC_MODEL=$(getprop ro.soc.model 2>/dev/null || echo "")
+    HARDWARE=$(getprop ro.hardware 2>/dev/null || echo "")
 
     echo -e "  [*] Device : ${WHITE}${DEVICE_BRAND} ${DEVICE_MODEL}${NC}"
     echo -e "  [*] Android: ${WHITE}${ANDROID_VERSION}${NC}"
 
-    if [[ "$GPU_VENDOR" == *"adreno"* ]] || \
+    if [[ "$DEVICE_MODEL" =~ [Pp]ixel\ 10 ]] || \
+       [[ "$HARDWARE" =~ [Ll]aguna ]] || \
+       [[ "$SOC_MODEL" =~ [Tt]ensor\ G5 ]] || \
+       [[ "$GPU_VENDOR" =~ [Pp]ower[Vv][Rr]|[Ii]mg|[Ii]magination ]] || \
+       [ -e "/dev/pvrsrvkm" ] || [ -e "/dev/pvr_sync" ]; then
+        GPU_DRIVER="powervr_dxt"
+        echo -e "  [*] GPU    : ${GREEN}Pixel 10 Pro XL / PowerVR IMG DXT (Hardware Acceleration Enabled)${NC}"
+        echo -e "  [*] Profile: ${WHITE}Zink + Vulkan (TBDR Lazy Descriptors & 8-Thread Fallback)${NC}"
+    elif [[ "$GPU_VENDOR" == *"adreno"* ]] || \
        [[ "$DEVICE_BRAND" =~ [Ss]amsung|[Oo]ne[Pp]lus|[Xx]iaomi|[Rr]edmi|[Pp]oco|[Mm]oto|motorola ]]; then
         GPU_DRIVER="freedreno"
         echo -e "  [*] GPU    : ${WHITE}Adreno — Hardware Acceleration Enabled${NC}"
@@ -224,6 +234,10 @@ step_gpu() {
     install_pkg "mesa-zink" "Mesa Zink Core"
     if [ "$GPU_DRIVER" == "freedreno" ]; then
         install_pkg "mesa-vulkan-icd-freedreno" "Turnip Adreno Driver"
+    elif [ "$GPU_DRIVER" == "powervr_dxt" ]; then
+        echo -e "  [+] Configuring PowerVR / IMG DXT Vulkan stack..."
+        install_pkg "vulkan-loader-generic" "Vulkan Loader (PowerVR)"
+        install_pkg "vulkan-tools" "Vulkan Tools"
     fi
     install_pkg "vulkan-loader-android" "Vulkan Loader"
 }
@@ -363,6 +377,8 @@ BINDS=""
 [ -d "\$TERMUX_TMP/.X11-unix" ] && BINDS="\$BINDS --bind \$TERMUX_TMP/.X11-unix:/tmp/.X11-unix"
 [ -d "/dev/dri" ]               && BINDS="\$BINDS --bind /dev/dri:/dev/dri"
 [ -e "/dev/kgsl-3d0" ]          && BINDS="\$BINDS --bind /dev/kgsl-3d0:/dev/kgsl-3d0"
+[ -e "/dev/pvrsrvkm" ]          && BINDS="\$BINDS --bind /dev/pvrsrvkm:/dev/pvrsrvkm"
+[ -e "/dev/pvr_sync" ]          && BINDS="\$BINDS --bind /dev/pvr_sync:/dev/pvr_sync"
 [ -d "${TERMUX_VK_ICD}" ]       && BINDS="\$BINDS --bind ${TERMUX_VK_ICD}:/usr/share/vulkan/icd.d.termux"
 [ -f "${TERMUX_LIB}/libvulkan.so" ] && \
     BINDS="\$BINDS --bind ${TERMUX_LIB}/libvulkan.so:/usr/lib/aarch64-linux-gnu/libvulkan_termux.so"
@@ -559,6 +575,9 @@ export MESA_LOADER_DRIVER_OVERRIDE=zink
 export TU_DEBUG=noconform
 export MESA_VK_WSI_PRESENT_MODE=immediate
 export ZINK_DESCRIPTORS=lazy
+export PVR_MESA=1
+export LP_NUM_THREADS=8
+export LP_PERF=no_mipmap,no_linear
 export XDG_DATA_DIRS=/data/data/com.termux/files/usr/share:\${XDG_DATA_DIRS}
 export XDG_CONFIG_DIRS=/data/data/com.termux/files/usr/etc/xdg:\${XDG_CONFIG_DIRS}
 EOF

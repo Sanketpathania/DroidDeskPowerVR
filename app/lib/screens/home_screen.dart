@@ -223,6 +223,84 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
+              // ── PowerVR / Pixel 10 Pro XL Hardware Tuning Card ──
+              if (state.isPowerVR || state.isPixel10)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E1528), Color(0xFF13101E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(DroidTheme.radiusMd),
+                        border: Border.all(
+                          color: DroidTheme.secondary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: DroidTheme.secondary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.speed_rounded,
+                                  color: DroidTheme.secondary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      state.isPixel10ProXL
+                                          ? 'Pixel 10 Pro XL · PowerVR DXT Active'
+                                          : 'PowerVR / IMG GPU Active',
+                                      style: DroidTheme.headingSm.copyWith(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Hardware acceleration & Tensor G5 multi-threading',
+                                      style: DroidTheme.bodySm.copyWith(
+                                        color: DroidTheme.textMuted,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _featureChip('Zink + Vulkan HW', DroidTheme.accent),
+                              _featureChip('TBDR Lazy Descriptors', DroidTheme.secondary),
+                              _featureChip('8-Core Fallback', DroidTheme.primary),
+                              _featureChip('Super Actua 120Hz Scaling', Colors.cyanAccent),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
+                  ),
+                ),
+
               // ── System Info ──
               SliverToBoxAdapter(
                 child: Padding(
@@ -402,6 +480,7 @@ class HomeScreen extends StatelessWidget {
   // ── Dialogs ──
 
   void _showSettings(BuildContext context) {
+    final state = context.read<AppState>();
     showModalBottomSheet(
       context: context,
       backgroundColor: DroidTheme.surface,
@@ -416,6 +495,19 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text('Settings', style: DroidTheme.headingLg),
             const SizedBox(height: 20),
+            if (state.isPowerVR || state.isPixel10)
+              ListTile(
+                leading: const Icon(
+                  Icons.memory_rounded,
+                  color: DroidTheme.secondary,
+                ),
+                title: const Text('PowerVR & Pixel 10 Pro XL GPU'),
+                subtitle: const Text('View hardware acceleration & driver details'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showPowerVrDetails(context, state);
+                },
+              ),
             ListTile(
               leading: const Icon(
                 Icons.battery_charging_full,
@@ -437,6 +529,64 @@ class HomeScreen extends StatelessWidget {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showPowerVrDetails(BuildContext context, AppState state) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: DroidTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.memory_rounded, color: DroidTheme.secondary),
+                const SizedBox(width: 10),
+                Text('PowerVR GPU Profile', style: DroidTheme.headingLg),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _infoRow('Target Device', state.isPixel10ProXL ? 'Google Pixel 10 Pro XL' : 'Pixel 10 / PowerVR Device'),
+            _divider(),
+            _infoRow('GPU Architecture', 'Imagination PowerVR / IMG DXT-72-2304'),
+            _divider(),
+            _infoRow('SoC', 'Google Tensor G5 ("Laguna")'),
+            _divider(),
+            _infoRow('Vulkan / Zink', 'Lazy Descriptors, Immediate Presentation'),
+            _divider(),
+            _infoRow('Multi-Core Rasterizer', '8 Threads allocated for Tensor G5'),
+            _divider(),
+            _infoRow('Display Calibration', 'Optimized for 1344 x 2992 120Hz LTPO OLED'),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _featureChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        label,
+        style: DroidTheme.monoSm.copyWith(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

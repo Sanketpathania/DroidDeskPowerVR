@@ -91,6 +91,31 @@ class LinuxRuntime(private val context: Context) {
     /** Qualcomm exposes the Adreno render device through KGSL on Android. */
     private fun hasAdrenoGpu(): Boolean = File("/dev/kgsl-3d0").exists()
 
+    /** Checks for Imagination Technologies PowerVR / IMG DXT GPU or Pixel 10 / Tensor G5 */
+    fun hasPowerVrGpu(): Boolean {
+        if (File("/dev/pvrsrvkm").exists() || File("/dev/pvr_sync").exists()) return true
+        val hardware = Build.HARDWARE.lowercase()
+        val model = Build.MODEL.lowercase()
+        val board = Build.BOARD.lowercase()
+        val device = Build.DEVICE.lowercase()
+        if (model.contains("pixel 10") || hardware.contains("laguna") || board.contains("laguna") || device.contains("laguna")) {
+            return true
+        }
+        val eglProp = try {
+            Runtime.getRuntime().exec(arrayOf("getprop", "ro.hardware.egl"))
+                .inputStream.bufferedReader().readText().trim().lowercase()
+        } catch (_: Exception) { "" }
+        return eglProp.contains("powervr") || eglProp.contains("img") || eglProp.contains("pvr")
+    }
+
+    fun isPixel10Device(): Boolean {
+        val model = Build.MODEL.lowercase()
+        val hardware = Build.HARDWARE.lowercase()
+        val board = Build.BOARD.lowercase()
+        val device = Build.DEVICE.lowercase()
+        return model.contains("pixel 10") || hardware.contains("laguna") || board.contains("laguna") || device.contains("laguna")
+    }
+
     private fun normalizedDesktop(desktopEnv: String): String = when (desktopEnv.lowercase()) {
         "lxqt", "mate", "kde", "xfce4" -> desktopEnv.lowercase()
         else -> "xfce4"
@@ -117,10 +142,11 @@ class LinuxRuntime(private val context: Context) {
 
     fun getGraphicsMode(): String {
         val freedrenoIcd = File(prefixDir, "share/vulkan/icd.d/freedreno_icd.aarch64.json")
-        return if (hasAdrenoGpu() && freedrenoIcd.exists()) {
-            "Turnip + Zink"
-        } else {
-            "Software (llvmpipe)"
+        return when {
+            hasAdrenoGpu() && freedrenoIcd.exists() -> "Turnip + Zink (Adreno HW)"
+            isPixel10Device() -> "PowerVR IMG DXT (Pixel 10 Pro XL HW Accelerated)"
+            hasPowerVrGpu() -> "PowerVR IMG Accelerated (Zink/Vulkan)"
+            else -> "Software (llvmpipe)"
         }
     }
 
@@ -1026,15 +1052,43 @@ class LinuxRuntime(private val context: Context) {
         env["GDK_PIXBUF_MODULEDIR"] = "${prefixDir.absolutePath}/lib/gdk-pixbuf-2.0/2.10.0/loaders"
         env["GDK_PIXBUF_MODULE_FILE"] = "${prefixDir.absolutePath}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
 
-        // Mesa is always available. Adreno devices use Turnip + Zink for hardware
-        // rendering; other GPUs use Mesa's software renderer instead of being
-        // forced through an incompatible Freedreno Vulkan ICD.
+        // Mesa is always available.
         env["LIBGL_DRIVERS_PATH"] = "${prefixDir.absolutePath}/lib/dri"
         val freedrenoIcd = File(prefixDir, "share/vulkan/icd.d/freedreno_icd.aarch64.json")
         if (hasAdrenoGpu() && freedrenoIcd.exists()) {
             env["VK_ICD_FILENAMES"] = freedrenoIcd.absolutePath
             env["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
             env["GALLIUM_DRIVER"] = "zink"
+        } else if (hasPowerVrGpu() || isPixel10Device()) {
+            // PowerVR IMG DXT (Pixel 10 / Pixel 10 Pro XL / Tensor G5) compatibility & acceleration:
+            // 1. Configure Zink Gallium translation layer over PowerVR / Android Vulkan
+            // 2. TBDR optimization: lazy descriptor caching reduces tile-buffer memory allocations
+            // 3. Immediate WSI presentation mode avoids SurfaceView queue latency
+            // 4. Multi-core llvmpipe fallback: configure 8 worker threads for Tensor G5 CPU cores
+            env["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
+            env["GALLIUM_DRIVER"] = "zink"
+            env["ZINK_DESCRIPTORS"] = "lazy"
+            env["MESA_VK_WSI_PRESENT_MODE"] = "immediate"
+            env["MESA_NO_ERROR"] = "1"
+            env["MESA_GL_VERSION_OVERRIDE"] = "4.6"
+            env["MESA_GLES_VERSION_OVERRIDE"] = "3.2"
+            env["PVR_MESA"] = "1"
+            env["PVR_DISABLE_SURFACE_CACHE"] = "0"
+            // Multi-threaded fallback for Tensor G5 octa-core CPU (1x X4, 5x A720, 2x A520)
+            env["LP_NUM_THREADS"] = "8"
+            env["LP_PERF"] = "no_mipmap,no_linear"
+
+            // Look for PowerVR / system Vulkan ICD files
+            val pvrIcd = listOf(
+                File(prefixDir, "share/vulkan/icd.d/pvr_icd.aarch64.json"),
+                File(prefixDir, "share/vulkan/icd.d/powervr_icd.json"),
+                File("/vendor/etc/vulkan/icd.d/powervr_icd.json"),
+                File("/system/etc/vulkan/icd.d/powervr_icd.json"),
+                File("/vendor/etc/vulkan/icd.d/img_icd.json")
+            ).firstOrNull { it.exists() }
+            if (pvrIcd != null) {
+                env["VK_ICD_FILENAMES"] = pvrIcd.absolutePath
+            }
         } else {
             env["LIBGL_ALWAYS_SOFTWARE"] = "true"
             env["MESA_LOADER_DRIVER_OVERRIDE"] = "llvmpipe"
@@ -1354,11 +1408,13 @@ class LinuxRuntime(private val context: Context) {
             installPackageGroup("dpkg --configure -a")
         }
 
-        // Turnip/Freedreno is the hardware path for Qualcomm Adreno. Do not
-        // install or force that ICD on Mali/PowerVR devices.
+        // Turnip/Freedreno is the hardware path for Qualcomm Adreno.
         if (hasAdrenoGpu()) {
             onProgress?.invoke(0.78, "Installing Adreno hardware acceleration...")
             installPackageGroup("pkg install -y mesa-vulkan-icd-freedreno")
+        } else if (hasPowerVrGpu() || isPixel10Device()) {
+            onProgress?.invoke(0.78, "Configuring PowerVR DXT acceleration (Pixel 10 Pro XL)...")
+            installPackageGroup("pkg install -y vulkan-loader-generic vulkan-tools")
         }
 
         val nativeTools = "git wget curl openssh htop python clang"

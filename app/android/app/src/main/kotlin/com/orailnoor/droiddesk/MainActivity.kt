@@ -19,6 +19,10 @@ import com.orailnoor.droiddesk.x11.X11ServerService
 import kotlin.concurrent.thread
 import android.util.Log
 import android.widget.Toast
+import java.io.File
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLContext
+import javax.microedition.khronos.opengles.GL10
 
 class MainActivity : FlutterActivity() {
 
@@ -150,15 +154,25 @@ class MainActivity : FlutterActivity() {
 
                 // ── Device Info ──
                 "getDeviceInfo" -> {
+                    val (gpuVendor, gpuRenderer) = detectGpuStrings()
+                    val isPvr = isPowerVrGpu()
+                    val isP10 = isPixel10Device()
+                    val isP10ProXL = Build.MODEL.contains("Pixel 10 Pro XL", ignoreCase = true)
                     result.success(mapOf(
                         "model" to Build.MODEL,
                         "brand" to Build.BRAND,
                         "androidVersion" to Build.VERSION.RELEASE,
                         "sdkVersion" to Build.VERSION.SDK_INT,
                         "cpuAbi" to Build.SUPPORTED_ABIS.firstOrNull(),
-                        "gpuVendor" to getGpuVendor(),
+                        "hardware" to Build.HARDWARE,
+                        "board" to Build.BOARD,
+                        "gpuVendor" to gpuVendor,
+                        "gpuRenderer" to gpuRenderer,
+                        "isPowerVR" to isPvr,
+                        "isPixel10" to isP10,
+                        "isPixel10ProXL" to isP10ProXL,
                         "graphicsMode" to if (chrootRuntime.hasRoot()) {
-                            "Software (llvmpipe)"
+                            if (isPvr) "PowerVR DXT Hardware Accelerated (Chroot)" else "Software (llvmpipe)"
                         } else {
                             linuxRuntime.getGraphicsMode()
                         },
@@ -523,16 +537,120 @@ class MainActivity : FlutterActivity() {
 
     // ── Hardware Detection ──
 
-    private fun getGpuVendor(): String {
-        return try {
-            val prop = Runtime.getRuntime().exec(arrayOf("getprop", "ro.hardware.egl"))
-            val result = prop.inputStream.bufferedReader().readText().trim()
-            prop.waitFor()
-            if (result.isNotEmpty()) result else "unknown"
-        } catch (e: Exception) {
-            "unknown"
-        }
+    private var cachedGpuVendor: String? = null
+    private var cachedGpuRenderer: String? = null
+
+    private fun isPixel10Device(): Boolean {
+        val model = Build.MODEL.lowercase()
+        val hardware = Build.HARDWARE.lowercase()
+        val board = Build.BOARD.lowercase()
+        val device = Build.DEVICE.lowercase()
+        return model.contains("pixel 10") ||
+               hardware.contains("laguna") ||
+               board.contains("laguna") ||
+               device.contains("laguna")
     }
+
+    private fun isPowerVrGpu(): Boolean {
+        if (File("/dev/pvrsrvkm").exists() || File("/dev/pvr_sync").exists()) return true
+        val (vendor, renderer) = detectGpuStrings()
+        val v = vendor.lowercase()
+        val r = renderer.lowercase()
+        return v.contains("powervr") || v.contains("imagination") || v.contains("img") ||
+               r.contains("powervr") || r.contains("dxt") || r.contains("rogue") ||
+               isPixel10Device()
+    }
+
+    private fun detectGpuStrings(): Pair<String, String> {
+        val cv = cachedGpuVendor
+        val cr = cachedGpuRenderer
+        if (cv != null && cr != null) {
+            return Pair(cv, cr)
+        }
+
+        var vendor = "unknown"
+        var renderer = "unknown"
+
+        try {
+            val egl = EGLContext.getEGL() as? EGL10
+            val display = egl?.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
+            if (egl != null && display != null && display != EGL10.EGL_NO_DISPLAY) {
+                val version = IntArray(2)
+                if (egl.eglInitialize(display, version)) {
+                    val configAttribs = intArrayOf(
+                        EGL10.EGL_RENDERABLE_TYPE, 4,
+                        EGL10.EGL_NONE
+                    )
+                    val configs = arrayOfNulls<javax.microedition.khronos.egl.EGLConfig>(1)
+                    val numConfigs = IntArray(1)
+                    egl.eglChooseConfig(display, configAttribs, configs, 1, numConfigs)
+                    if (numConfigs[0] > 0 && configs[0] != null) {
+                        val contextAttribs = intArrayOf(0x3098, 2, EGL10.EGL_NONE)
+                        val context = egl.eglCreateContext(display, configs[0], EGL10.EGL_NO_CONTEXT, contextAttribs)
+                        val surfaceAttribs = intArrayOf(EGL10.EGL_WIDTH, 1, EGL10.EGL_HEIGHT, 1, EGL10.EGL_NONE)
+                        val pbuffer = egl.eglCreatePbufferSurface(display, configs[0], surfaceAttribs)
+                        if (context != null && context != EGL10.EGL_NO_CONTEXT && pbuffer != null && pbuffer != EGL10.EGL_NO_SURFACE) {
+                            egl.eglMakeCurrent(display, pbuffer, pbuffer, context)
+                            val gl = context.gl as? GL10
+                            val glVendor = gl?.glGetString(GL10.GL_VENDOR)?.trim()
+                            val glRenderer = gl?.glGetString(GL10.GL_RENDERER)?.trim()
+                            if (!glVendor.isNullOrEmpty()) vendor = glVendor
+                            if (!glRenderer.isNullOrEmpty()) renderer = glRenderer
+                            egl.eglMakeCurrent(display, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)
+                            egl.eglDestroySurface(display, pbuffer)
+                            egl.eglDestroyContext(display, context)
+                        }
+                    }
+                    egl.eglTerminate(display)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Direct EGL probe failed: ${t.message}")
+        }
+
+        if (vendor == "unknown") {
+            vendor = getGpuVendorFromProps()
+        }
+
+        if (isPixel10Device()) {
+            if (vendor == "unknown" || vendor.isEmpty()) {
+                vendor = "Imagination Technologies"
+            }
+            if (renderer == "unknown" || renderer.isEmpty()) {
+                renderer = "PowerVR IMG DXT-72-2304 (Tensor G5)"
+            }
+        }
+
+        cachedGpuVendor = vendor
+        cachedGpuRenderer = renderer
+        return Pair(vendor, renderer)
+    }
+
+    private fun getGpuVendorFromProps(): String {
+        val props = listOf("ro.hardware.egl", "ro.hardware", "ro.board.platform", "ro.soc.model")
+        for (propName in props) {
+            try {
+                val prop = Runtime.getRuntime().exec(arrayOf("getprop", propName))
+                val result = prop.inputStream.bufferedReader().readText().trim()
+                prop.waitFor()
+                if (result.isNotEmpty() && result != "unknown") {
+                    if (result.contains("powervr", true) || result.contains("img", true) || result.contains("pvr", true)) {
+                        return "Imagination Technologies (PowerVR)"
+                    }
+                    if (result.contains("adreno", true) || result.contains("qcom", true)) {
+                        return "Qualcomm Adreno"
+                    }
+                    if (result.contains("mali", true)) {
+                        return "Arm Mali"
+                    }
+                    if (propName == "ro.hardware.egl") return result
+                }
+            } catch (_: Exception) {}
+        }
+        return "unknown"
+    }
+
+    private fun getGpuVendor(): String = detectGpuStrings().first
 
     private fun getTotalRam(): Long {
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager

@@ -1,0 +1,6 @@
+{
+  "name": "DroidDesk - Linux Desktop & PowerVR Manager",
+  "description": "Full Linux desktop environment manager with PowerVR IMG DXT and Pixel 10 Pro XL hardware acceleration, package catalog, interactive terminal, and system diagnostics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

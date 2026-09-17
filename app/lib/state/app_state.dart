@@ -72,11 +72,54 @@ class AppState extends ChangeNotifier {
   bool get isSetupComplete => _isBootstrapped && _installedDE.isNotEmpty;
   bool get isDEInstalled => _installedDE.isNotEmpty;
 
+  bool get isPixel10ProXL {
+    final model = _deviceInfo['model']?.toString().toLowerCase() ?? '';
+    return _deviceInfo['isPixel10ProXL'] == true || model.contains('pixel 10 pro xl');
+  }
+
+  bool get isPixel10 {
+    final model = _deviceInfo['model']?.toString().toLowerCase() ?? '';
+    final hardware = _deviceInfo['hardware']?.toString().toLowerCase() ?? '';
+    final board = _deviceInfo['board']?.toString().toLowerCase() ?? '';
+    return _deviceInfo['isPixel10'] == true ||
+        isPixel10ProXL ||
+        model.contains('pixel 10') ||
+        hardware.contains('laguna') ||
+        board.contains('laguna');
+  }
+
+  bool get isPowerVR {
+    final vendor = _deviceInfo['gpuVendor']?.toString().toLowerCase() ?? '';
+    final renderer = _deviceInfo['gpuRenderer']?.toString().toLowerCase() ?? '';
+    return _deviceInfo['isPowerVR'] == true ||
+        isPixel10 ||
+        vendor.contains('powervr') ||
+        vendor.contains('imagination') ||
+        vendor.contains('img') ||
+        renderer.contains('dxt') ||
+        renderer.contains('powervr') ||
+        renderer.contains('rogue');
+  }
+
   String get gpuType {
-    final vendor = _deviceInfo['gpuVendor']?.toString() ?? '';
+    if (isPixel10ProXL) {
+      return 'Pixel 10 Pro XL · PowerVR IMG DXT (Tensor G5)';
+    }
+    if (isPixel10) {
+      return 'Pixel 10 · PowerVR IMG DXT (Tensor G5)';
+    }
+    final vendor = _deviceInfo['gpuVendor']?.toString().toLowerCase() ?? '';
+    final renderer = _deviceInfo['gpuRenderer']?.toString().toLowerCase() ?? '';
+    if (vendor.contains('powervr') ||
+        vendor.contains('imagination') ||
+        vendor.contains('img') ||
+        renderer.contains('dxt') ||
+        renderer.contains('powervr') ||
+        renderer.contains('rogue')) {
+      return 'PowerVR / IMG Graphics';
+    }
     if (vendor.contains('adreno')) return 'Adreno (Snapdragon)';
-    if (vendor.contains('mali')) return 'Mali (MediaTek/Exynos)';
-    if (vendor.contains('powervr')) return 'PowerVR';
+    if (vendor.contains('mali')) return 'Mali / Immortalis';
     return 'Unknown GPU';
   }
 

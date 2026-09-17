@@ -342,6 +342,9 @@ class RootfsManager(private val context: Context) {
                 export TU_DEBUG=noconform
                 export ZINK_DESCRIPTORS=lazy
                 export MESA_VK_WSI_PRESENT_MODE=immediate
+                export PVR_MESA=1
+                export LP_NUM_THREADS=8
+                export LP_PERF=no_mipmap,no_linear
                 
                 # XDG directories
                 export XDG_RUNTIME_DIR=/tmp/runtime-root
