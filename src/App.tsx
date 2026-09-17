@@ -132,7 +132,11 @@ export default function App() {
   const [pvrImmediateWsi, setPvrImmediateWsi] = useState(true);
   const [pvrMultiThreads, setPvrMultiThreads] = useState(8);
   const [pvrNoError, setPvrNoError] = useState(true);
+  const [pvrDiskShaderCache, setPvrDiskShaderCache] = useState(true);
+  const [pvrGlslOverride, setPvrGlslOverride] = useState(true);
+  const [pvrDisableCompositorShadows, setPvrDisableCompositorShadows] = useState(true);
   const [pvrNodesBound, setPvrNodesBound] = useState(true);
+  const [copiedProfile, setCopiedProfile] = useState(false);
 
   // Terminal state
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
@@ -890,11 +894,119 @@ export default function App() {
                     />
                   </button>
                 </div>
+
+                {/* Disk Shader Cache */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white text-sm">Persistent Disk Shader Cache</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
+                        MESA_DISK_CACHE_DIR=~/.cache
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Caches compiled SPIR-V & GLSL pipelines to flash storage, eliminating micro-stutters during 3D scene transitions and application launches.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setPvrDiskShaderCache(!pvrDiskShaderCache)}
+                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
+                      pvrDiskShaderCache ? 'bg-blue-500' : 'bg-neutral-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                        pvrDiskShaderCache ? 'left-7' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* GLSL 4.60 Core Profile Override */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white text-sm">GLSL 4.60 Core Profile Override</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                        MESA_GLSL_VERSION_OVERRIDE=460
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Forces reporting of OpenGL 4.6 / GLSL 460 support to prevent modern Linux desktop apps (Blender, Godot, Krita) from rejecting hardware acceleration.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setPvrGlslOverride(!pvrGlslOverride)}
+                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
+                      pvrGlslOverride ? 'bg-emerald-500' : 'bg-neutral-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                        pvrGlslOverride ? 'left-7' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* XFWM4 Compositor Shadow Bypass */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white text-sm">Bypass Window Shadows & Blending</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
+                        xfconf-query /use_compositing
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Disables software alpha window shadows in XFCE, preventing excessive tile redraws across the PowerVR 32x32 TBDR tile buffer.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setPvrDisableCompositorShadows(!pvrDisableCompositorShadows)}
+                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
+                      pvrDisableCompositorShadows ? 'bg-rose-500' : 'bg-neutral-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                        pvrDisableCompositorShadows ? 'left-7' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Active Profile Summary */}
-              <div className="p-4 rounded-xl bg-[#0e101a] border border-white/10 font-mono text-xs text-neutral-300 space-y-1.5">
-                <div className="text-cyan-400 font-semibold mb-2"># Active Environment Profile (/etc/profile.d/droiddesk.sh)</div>
+              <div className="p-4 rounded-xl bg-[#0e101a] border border-white/10 font-mono text-xs text-neutral-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-cyan-400 font-semibold"># Active Environment Profile (/etc/profile.d/droiddesk.sh)</div>
+                  <button
+                    onClick={() => {
+                      const snippet = [
+                        'export DISPLAY=:0',
+                        'export GALLIUM_DRIVER=zink',
+                        'export MESA_LOADER_DRIVER_OVERRIDE=zink',
+                        `export ZINK_DESCRIPTORS=${pvrLazyDescriptors ? 'lazy' : 'standard'}`,
+                        `export MESA_VK_WSI_PRESENT_MODE=${pvrImmediateWsi ? 'immediate' : 'fifo'}`,
+                        `export LP_NUM_THREADS=${pvrMultiThreads}`,
+                        `export MESA_NO_ERROR=${pvrNoError ? '1' : '0'}`,
+                        `export MESA_GL_VERSION_OVERRIDE=4.6`,
+                        `export MESA_GLSL_VERSION_OVERRIDE=${pvrGlslOverride ? '460' : '330'}`,
+                        `export MESA_GLES_VERSION_OVERRIDE=3.2`,
+                        `export MESA_DISK_CACHE_DIR=${pvrDiskShaderCache ? '$HOME/.cache/mesa_shader_cache' : ''}`,
+                        'export PVR_MESA=1',
+                        'export PVR_DISABLE_SURFACE_CACHE=0'
+                      ].filter(Boolean).join('\n');
+                      navigator.clipboard.writeText(snippet);
+                      setCopiedProfile(true);
+                      setTimeout(() => setCopiedProfile(false), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] text-white flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    {copiedProfile ? '✓ Copied!' : 'Copy Script'}
+                  </button>
+                </div>
                 <p>export DISPLAY=:0</p>
                 <p>export GALLIUM_DRIVER=zink</p>
                 <p>export MESA_LOADER_DRIVER_OVERRIDE=zink</p>
@@ -902,7 +1014,90 @@ export default function App() {
                 <p>export MESA_VK_WSI_PRESENT_MODE={pvrImmediateWsi ? 'immediate' : 'fifo'}</p>
                 <p>export LP_NUM_THREADS={pvrMultiThreads}</p>
                 <p>export MESA_NO_ERROR={pvrNoError ? '1' : '0'}</p>
+                <p>export MESA_GL_VERSION_OVERRIDE=4.6</p>
+                <p>export MESA_GLSL_VERSION_OVERRIDE={pvrGlslOverride ? '460' : '330'}</p>
+                <p>export MESA_GLES_VERSION_OVERRIDE=3.2</p>
+                {pvrDiskShaderCache && <p>export MESA_DISK_CACHE_DIR=$HOME/.cache/mesa_shader_cache</p>}
                 <p>export PVR_MESA=1</p>
+                <p>export PVR_DISABLE_SURFACE_CACHE=0</p>
+              </div>
+
+              {/* Comprehensive PowerVR Optimization & Best Practices Guide */}
+              <div className="space-y-4 pt-4 border-t border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" /> Pixel 10 PowerVR Compatibility & Best Practices
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {/* Suggestion 1 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                      <span>1. TBDR Tile Buffer & Overdraw Elimination</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      PowerVR renders in discrete <strong>32x32 pixel tiles</strong> using Hidden Surface Removal (HSR). Avoid full-screen transparent overlays or active software compositing shadows that dirty the tile cache. Disabling XFWM4 shadows can reduce GPU memory traffic by over 40%.
+                    </p>
+                  </div>
+
+                  {/* Suggestion 2 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-purple-300 flex items-center gap-2">
+                      <span>2. Android Phantom Process Killer Bypass</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      Android 15/16 terminates background child processes exceeding 32 instances. If compiling large C++/Rust packages or running background servers, disable this restriction via ADB:
+                    </p>
+                    <code className="block p-2 rounded bg-black/40 text-[11px] font-mono text-neutral-300 select-all">
+                      adb shell device_config put activity_manager max_phantom_processes 2147483647
+                    </code>
+                  </div>
+
+                  {/* Suggestion 3 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-amber-300 flex items-center gap-2">
+                      <span>3. Chromium / Web Browser GPU Flags</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      Launch Chromium or Firefox with hardware rasterization enabled and GPU blocklist ignored to route web rendering through Zink/PowerVR:
+                    </p>
+                    <code className="block p-2 rounded bg-black/40 text-[11px] font-mono text-neutral-300 select-all">
+                      chromium --enable-features=CanvasOopRasterization --enable-gpu-rasterization --ignore-gpu-blocklist
+                    </code>
+                  </div>
+
+                  {/* Suggestion 4 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-emerald-300 flex items-center gap-2">
+                      <span>4. VS Code & Electron Desktop Apps</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      Electron apps should bypass the sandbox and use desktop OpenGL for direct DRI drawing on DISPLAY=:0:
+                    </p>
+                    <code className="block p-2 rounded bg-black/40 text-[11px] font-mono text-neutral-300 select-all">
+                      code-oss --disable-gpu-sandbox --use-gl=desktop --ozone-platform=x11
+                    </code>
+                  </div>
+
+                  {/* Suggestion 5 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-blue-300 flex items-center gap-2">
+                      <span>5. Tensor G5 Multi-Core Thread Affinity</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      Tensor G5 utilizes 1x Cortex-X4, 5x Cortex-A720, and 2x Cortex-A520 cores. For intensive tasks, bind workloads to performance cores (cores 1-7) using <code className="text-cyan-300">taskset -c 1-7 &lt;command&gt;</code> to prevent scheduler thrashing on efficiency cores.
+                    </p>
+                  </div>
+
+                  {/* Suggestion 6 */}
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                    <div className="font-semibold text-rose-300 flex items-center gap-2">
+                      <span>6. 120Hz Super Actua Display Synchronization</span>
+                    </div>
+                    <p className="text-neutral-400 leading-relaxed">
+                      The Pixel 10 Pro XL features a 120Hz LTPO display (8.33ms frame budget). Running <code className="text-cyan-300">MESA_VK_WSI_PRESENT_MODE=immediate</code> eliminates VSync queue lag, producing snappy cursor tracking and low-latency interaction.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

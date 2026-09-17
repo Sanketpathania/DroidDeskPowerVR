@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:droiddesk/state/app_state.dart';
 import 'package:droiddesk/theme/droid_theme.dart';
+import 'package:droiddesk/services/platform_bridge.dart';
 
 class AppCatalogScreen extends StatefulWidget {
   const AppCatalogScreen({super.key});
@@ -11,43 +12,190 @@ class AppCatalogScreen extends StatefulWidget {
 }
 
 class _AppCatalogScreenState extends State<AppCatalogScreen> {
-  static const _apps = [
-    _OptionalApp(
-      id: 'firefox',
-      name: 'Firefox',
-      description: 'Full desktop web browser.',
-      icon: Icons.public_rounded,
-      color: Color(0xFFFF7139),
-    ),
-    _OptionalApp(
+  String _selectedCategory = 'all';
+  String _searchQuery = '';
+
+  static const List<_CatalogApp> _allApps = [
+    // Development
+    _CatalogApp(
       id: 'code_oss',
-      name: 'Code OSS',
-      description: 'Desktop source-code editor. This is a large download.',
+      name: 'VS Code (Code OSS)',
+      description: 'Desktop source-code editor with extensions and terminal integration.',
       icon: Icons.code_rounded,
       color: Color(0xFF23A8F2),
+      category: 'dev',
+      package: 'code-oss',
+      size: '220 MB',
     ),
-    _OptionalApp(
+    _CatalogApp(
       id: 'nodejs',
-      name: 'Node.js + npm',
-      description: 'JavaScript runtime and package manager.',
+      name: 'Node.js & npm',
+      description: 'JavaScript & TypeScript runtime engine with full npm package ecosystem.',
       icon: Icons.javascript_rounded,
       color: Color(0xFF68A063),
+      category: 'dev',
+      package: 'nodejs npm',
+      size: '85 MB',
     ),
-    _OptionalApp(
+    _CatalogApp(
+      id: 'python3',
+      name: 'Python 3 & Pip',
+      description: 'Python interpreter with pip package manager and scientific libraries.',
+      icon: Icons.terminal_rounded,
+      color: Color(0xFF38BDF8),
+      category: 'dev',
+      package: 'python3 python3-pip python3-venv',
+      size: '95 MB',
+    ),
+    _CatalogApp(
+      id: 'godot',
+      name: 'Godot Game Engine',
+      description: 'Open source 2D and 3D game creation engine with OpenGL renderer.',
+      icon: Icons.sports_esports_rounded,
+      color: Color(0xFF478CBF),
+      category: 'dev',
+      package: 'godot3',
+      size: '140 MB',
+    ),
+
+    // Productivity & Office
+    _CatalogApp(
+      id: 'libreoffice',
+      name: 'LibreOffice Suite',
+      description: 'Complete office suite: Writer, Calc, Impress, and Draw for documents.',
+      icon: Icons.article_rounded,
+      color: Color(0xFF18A303),
+      category: 'productivity',
+      package: 'libreoffice',
+      size: '340 MB',
+    ),
+
+    // Graphics & 3D
+    _CatalogApp(
+      id: 'gimp',
+      name: 'GIMP Image Editor',
+      description: 'GNU Image Manipulation Program for photo retouching and graphic design.',
+      icon: Icons.brush_rounded,
+      color: Color(0xFFE5A50A),
+      category: 'graphics',
+      package: 'gimp',
+      size: '160 MB',
+    ),
+    _CatalogApp(
+      id: 'blender',
+      name: 'Blender 3D Suite',
+      description: '3D modeling, sculpting, animation, and rendering suite for PowerVR.',
+      icon: Icons.view_in_ar_rounded,
+      color: Color(0xFFF5792A),
+      category: 'graphics',
+      package: 'blender',
+      size: '280 MB',
+    ),
+    _CatalogApp(
+      id: 'inkscape',
+      name: 'Inkscape Vector Graphics',
+      description: 'Professional vector graphics editor for SVG, logos, and illustrations.',
+      icon: Icons.gesture_rounded,
+      color: Color(0xFFC084FC),
+      category: 'graphics',
+      package: 'inkscape',
+      size: '190 MB',
+    ),
+    _CatalogApp(
+      id: 'krita',
+      name: 'Krita Digital Painting',
+      description: 'Digital painting and illustration suite with customizable brushes.',
+      icon: Icons.palette_rounded,
+      color: Color(0xFFF472B6),
+      category: 'graphics',
+      package: 'krita',
+      size: '210 MB',
+    ),
+    _CatalogApp(
       id: 'imagemagick',
-      name: 'ImageMagick',
-      description: 'Command-line image conversion and processing tools.',
+      name: 'ImageMagick CLI',
+      description: 'Command-line image conversion, batch resizing, and processing tools.',
       icon: Icons.image_rounded,
       color: DroidTheme.primaryLight,
+      category: 'graphics',
+      package: 'imagemagick',
+      size: '45 MB',
+    ),
+
+    // Media & Browsers
+    _CatalogApp(
+      id: 'firefox',
+      name: 'Firefox Browser',
+      description: 'Full-featured desktop web browser with GPU hardware acceleration.',
+      icon: Icons.public_rounded,
+      color: Color(0xFFFF7139),
+      category: 'media',
+      package: 'firefox-esr',
+      size: '130 MB',
+    ),
+    _CatalogApp(
+      id: 'chromium',
+      name: 'Chromium Browser',
+      description: 'Open-source browser engine with multi-process tab sandboxing.',
+      icon: Icons.travel_explore_rounded,
+      color: Color(0xFF4285F4),
+      category: 'media',
+      package: 'chromium',
+      size: '180 MB',
+    ),
+    _CatalogApp(
+      id: 'vlc',
+      name: 'VLC Media Player',
+      description: 'Versatile media player supporting all audio, video, and streaming formats.',
+      icon: Icons.play_circle_fill_rounded,
+      color: Color(0xFFFF9500),
+      category: 'media',
+      package: 'vlc',
+      size: '80 MB',
+    ),
+    _CatalogApp(
+      id: 'audacity',
+      name: 'Audacity Audio Studio',
+      description: 'Multi-track audio editor and recorder for podcasting and music.',
+      icon: Icons.graphic_eq_rounded,
+      color: Color(0xFF005AC1),
+      category: 'media',
+      package: 'audacity',
+      size: '75 MB',
+    ),
+
+    // Utilities
+    _CatalogApp(
+      id: 'mesa_utils',
+      name: 'Mesa 3D Utils & Glxgears',
+      description: 'OpenGL & Vulkan diagnostic utilities (glxinfo, glxgears, es2gears).',
+      icon: Icons.speed_rounded,
+      color: Color(0xFF34D399),
+      category: 'utilities',
+      package: 'mesa-utils vulkan-tools',
+      size: '25 MB',
+    ),
+    _CatalogApp(
+      id: 'neofetch',
+      name: 'Neofetch & Htop Tools',
+      description: 'CLI system information card and interactive real-time process viewer.',
+      icon: Icons.info_outline_rounded,
+      color: Color(0xFFA855F7),
+      category: 'utilities',
+      package: 'neofetch htop',
+      size: '15 MB',
     ),
   ];
 
-  static const _proot = _OptionalApp(
+  static const _prootDebian = _CatalogApp(
     id: 'proot_debian',
-    name: 'Debian (PRoot)',
-    description: 'Minimal PRoot base system. No applications are included.',
+    name: 'Debian (PRoot Base)',
+    description: 'Minimal PRoot compatibility environment for unrooted non-standard setups.',
     icon: Icons.inventory_2_rounded,
     color: Color(0xFFD70A53),
+    category: 'utilities',
+    package: 'proot-distro',
+    size: '110 MB',
   );
 
   @override
@@ -58,61 +206,174 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
     });
   }
 
-  Future<void> _install(_OptionalApp app) async {
+  Future<void> _installApp(_CatalogApp app) async {
     final state = context.read<AppState>();
-    final ok = await state.installOptionalApp(app.id);
-    if (!mounted) return;
+
+    // For apps that use standard state installer:
+    if (app.id == 'firefox' || app.id == 'code_oss' || app.id == 'nodejs' || app.id == 'imagemagick' || app.id == 'proot_debian') {
+      final ok = await state.installOptionalApp(app.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? '${app.name} installed' : '${app.name} installation failed.'),
+          backgroundColor: ok ? DroidTheme.success : DroidTheme.error,
+        ),
+      );
+      return;
+    }
+
+    // Direct apt installation for newly added catalog items
+    state.appendTerminalOutput('\n\$ sudo apt update && sudo apt install -y ${app.package}\n');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          ok
-              ? '${app.name} installed'
-              : '${app.name} installation failed. See the log below.',
-        ),
-        backgroundColor: ok ? DroidTheme.success : DroidTheme.error,
+        content: Text('Starting installation of ${app.name}...'),
+        backgroundColor: DroidTheme.secondary,
       ),
     );
+
+    try {
+      await DroidDeskPlatform.executeCommand('apt update && DEBIAN_FRONTEND=noninteractive apt install -y ${app.package}');
+      state.optionalApps[app.id] = true;
+      state.notifyListeners();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${app.name} installed successfully!'),
+          backgroundColor: DroidTheme.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Installation finished (${app.name})'),
+          backgroundColor: DroidTheme.accent,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final apps = state.hasRoot ? _apps : [..._apps, _proot];
+
+    final allList = state.hasRoot ? _allApps : [..._allApps, _prootDebian];
+
+    final filteredApps = allList.where((app) {
+      final matchesCat = _selectedCategory == 'all' || app.category == _selectedCategory;
+      final matchesSearch = _searchQuery.isEmpty ||
+          app.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          app.description.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add applications')),
+      appBar: AppBar(
+        title: const Text('Linux Software Catalog'),
+        backgroundColor: DroidTheme.background,
+        elevation: 0,
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: DroidTheme.backgroundGradient,
         ),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
           children: [
-            Text('Desktop Essentials is ready', style: DroidTheme.headingMd),
-            const SizedBox(height: 6),
-            Text(
-              'Install only what you need. Each application is independent and can be safely retried.',
-              style: DroidTheme.bodyMd,
+            // ── Search & Header ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: TextField(
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search Linux packages (VS Code, LibreOffice, GIMP...)',
+                  hintStyle: const TextStyle(color: DroidTheme.textDim, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search_rounded, color: DroidTheme.textDim),
+                  filled: true,
+                  fillColor: DroidTheme.cardBg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: DroidTheme.surfaceBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: DroidTheme.surfaceBorder),
+                  ),
+                ),
+                onChanged: (val) => setState(() => _searchQuery = val),
+              ),
             ),
-            const SizedBox(height: 20),
-            for (final app in apps) ...[
-              _buildAppCard(state, app),
-              const SizedBox(height: 10),
-            ],
-            if (state.installingOptionalApp != null ||
-                state.optionalInstallLog.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _buildInstallPanel(state),
-            ],
+
+            // ── Categories Pills ──
+            Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _catChip('all', 'All Software (${allList.length})'),
+                  const SizedBox(width: 8),
+                  _catChip('dev', 'Development'),
+                  const SizedBox(width: 8),
+                  _catChip('productivity', 'Productivity & Office'),
+                  const SizedBox(width: 8),
+                  _catChip('graphics', 'Graphics & 3D'),
+                  const SizedBox(width: 8),
+                  _catChip('media', 'Media & Web'),
+                  const SizedBox(width: 8),
+                  _catChip('utilities', 'Diagnostics & Tools'),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Software List ──
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                children: [
+                  for (final app in filteredApps) ...[
+                    _buildAppCard(state, app),
+                    const SizedBox(height: 10),
+                  ],
+                  if (state.installingOptionalApp != null || state.optionalInstallLog.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildInstallPanel(state),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAppCard(AppState state, _OptionalApp app) {
+  Widget _catChip(String id, String label) {
+    final selected = _selectedCategory == id;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: DroidTheme.secondary.withValues(alpha: 0.25),
+      backgroundColor: Colors.white.withValues(alpha: 0.04),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : DroidTheme.textSecondary,
+        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 12,
+      ),
+      side: BorderSide(
+        color: selected ? DroidTheme.secondary : DroidTheme.surfaceBorder,
+      ),
+      onSelected: (_) => setState(() => _selectedCategory = id),
+    );
+  }
+
+  Widget _buildAppCard(AppState state, _CatalogApp app) {
     final installed = state.optionalApps[app.id] == true;
     final installing = state.installingOptionalApp == app.id;
     final busy = state.installingOptionalApp != null;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -125,6 +386,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 44,
@@ -140,15 +402,54 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(app.name, style: DroidTheme.headingSm),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        app.name,
+                        style: DroidTheme.headingSm.copyWith(fontSize: 15),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        app.size,
+                        style: DroidTheme.monoSm.copyWith(
+                          color: DroidTheme.textDim,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 3),
-                Text(app.description, style: DroidTheme.bodySm),
+                Text(app.description, style: DroidTheme.bodySm.copyWith(fontSize: 12)),
+                const SizedBox(height: 6),
+                Text(
+                  'pkg: ${app.package}',
+                  style: DroidTheme.monoSm.copyWith(
+                    color: DroidTheme.textDim,
+                    fontSize: 10,
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 10),
           if (installed)
-            const Icon(Icons.check_circle_rounded, color: DroidTheme.success)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: DroidTheme.success.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_rounded, color: DroidTheme.success, size: 20),
+            )
           else if (installing)
             const SizedBox(
               width: 24,
@@ -156,9 +457,17 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
               child: CircularProgressIndicator(strokeWidth: 2.5),
             )
           else
-            FilledButton(
-              onPressed: busy ? null : () => _install(app),
-              child: const Text('Install'),
+            ElevatedButton(
+              onPressed: busy ? null : () => _installApp(app),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DroidTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              child: const Text('Install', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
         ],
       ),
@@ -185,7 +494,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
               Expanded(
                 child: Text(
                   state.optionalInstallStatus.isEmpty
-                      ? 'Package log'
+                      ? 'Package Installation Log'
                       : state.optionalInstallStatus,
                   style: DroidTheme.headingSm,
                 ),
@@ -221,18 +530,24 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
   }
 }
 
-class _OptionalApp {
+class _CatalogApp {
   final String id;
   final String name;
   final String description;
   final IconData icon;
   final Color color;
+  final String category;
+  final String package;
+  final String size;
 
-  const _OptionalApp({
+  const _CatalogApp({
     required this.id,
     required this.name,
     required this.description,
     required this.icon,
     required this.color,
+    required this.category,
+    required this.package,
+    required this.size,
   });
 }

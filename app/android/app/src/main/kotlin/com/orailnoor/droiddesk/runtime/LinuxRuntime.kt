@@ -1065,15 +1065,20 @@ class LinuxRuntime(private val context: Context) {
             // 2. TBDR optimization: lazy descriptor caching reduces tile-buffer memory allocations
             // 3. Immediate WSI presentation mode avoids SurfaceView queue latency
             // 4. Multi-core llvmpipe fallback: configure 8 worker threads for Tensor G5 CPU cores
+            // 5. Persistent on-disk Mesa shader cache prevents compilation micro-stutters
             env["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
             env["GALLIUM_DRIVER"] = "zink"
             env["ZINK_DESCRIPTORS"] = "lazy"
             env["MESA_VK_WSI_PRESENT_MODE"] = "immediate"
             env["MESA_NO_ERROR"] = "1"
             env["MESA_GL_VERSION_OVERRIDE"] = "4.6"
+            env["MESA_GLSL_VERSION_OVERRIDE"] = "460"
             env["MESA_GLES_VERSION_OVERRIDE"] = "3.2"
             env["PVR_MESA"] = "1"
             env["PVR_DISABLE_SURFACE_CACHE"] = "0"
+            env["MESA_DISK_CACHE_DIR"] = "${homeDir.absolutePath}/.cache/mesa_shader_cache"
+            env["MESA_SHADER_CACHE_DIR"] = "${homeDir.absolutePath}/.cache/mesa_shader_cache"
+            env["MESA_DISK_CACHE_SINGLE_FILE"] = "1"
             // Multi-threaded fallback for Tensor G5 octa-core CPU (1x X4, 5x A720, 2x A520)
             env["LP_NUM_THREADS"] = "8"
             env["LP_PERF"] = "no_mipmap,no_linear"

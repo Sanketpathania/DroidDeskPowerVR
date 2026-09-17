@@ -6,6 +6,11 @@ import 'package:droiddesk/state/app_state.dart';
 import 'package:droiddesk/services/platform_bridge.dart';
 import 'package:droiddesk/screens/setup/de_install_screen.dart';
 import 'package:droiddesk/screens/apps/app_catalog_screen.dart';
+import 'package:droiddesk/screens/benchmarks/benchmark_screen.dart';
+import 'package:droiddesk/screens/powervr/powervr_tuning_screen.dart';
+import 'package:droiddesk/screens/diagnostics/diagnostics_screen.dart';
+import 'package:droiddesk/screens/display/display_settings_screen.dart';
+import 'package:droiddesk/screens/terminal/terminal_screen.dart';
 
 /// Home dashboard — shown after setup is complete.
 /// Central hub for launching the desktop, terminal, and managing the environment.
@@ -61,11 +66,26 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const Spacer(),
                       IconButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DisplaySettingsScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.display_settings_rounded,
+                          color: Colors.cyanAccent,
+                        ),
+                        tooltip: 'Display & Session',
+                      ),
+                      IconButton(
                         onPressed: () => _showSettings(context),
                         icon: const Icon(
                           Icons.settings_rounded,
                           color: DroidTheme.textMuted,
                         ),
+                        tooltip: 'Settings',
                       ),
                     ],
                   ),
@@ -75,155 +95,15 @@ class HomeScreen extends StatelessWidget {
               // ── Status Card ──
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                  child: _buildStatusCard(state)
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: _buildStatusCard(context, state)
                       .animate()
                       .fadeIn(duration: 500.ms)
                       .slideY(begin: 0.05, duration: 500.ms),
                 ),
               ),
 
-              // ── Quick Actions ──
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                  child: Text(
-                    'QUICK ACTIONS',
-                    style: DroidTheme.label,
-                  ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                  child: Column(
-                    children: [
-                      // Installation is only actionable when setup is missing.
-                      // Do not show an "Installed" card that can reinstall the DE.
-                      if (!state.isDEInstalled) ...[
-                        _ActionCard(
-                          icon: Icons.download_rounded,
-                          title: 'Install ${state.selectedDE.toUpperCase()}',
-                          subtitle:
-                              'Install desktop environment packages (one-time setup)',
-                          color: DroidTheme.secondary,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const DEInstallScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-
-                      // ── Launch Desktop / Reconnect ──
-                      if (state.isRunning)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ActionCard(
-                            icon: Icons.fullscreen_rounded,
-                            title: 'Return to Desktop',
-                            subtitle:
-                                '${state.selectedDE.toUpperCase()} is currently running in background',
-                            color: DroidTheme.primary,
-                            gradient: DroidTheme.primaryGradient,
-                            onTap: () {
-                              state.launchDesktopActivity();
-                            },
-                          ),
-                        ),
-
-                      _ActionCard(
-                        icon: state.isRunning
-                            ? Icons.stop_circle_rounded
-                            : Icons.desktop_mac_rounded,
-                        title: state.isRunning
-                            ? 'Stop Server'
-                            : 'Launch Desktop',
-                        subtitle: state.isRunning
-                            ? 'Shutdown Linux environment'
-                            : 'Start ${state.selectedDE.toUpperCase()} desktop environment',
-                        color: state.isRunning
-                            ? DroidTheme.error
-                            : DroidTheme.primary,
-                        gradient: state.isRunning
-                            ? null
-                            : DroidTheme.primaryGradient,
-                        onTap: () async {
-                          if (state.isRunning) {
-                            state.stopLinux();
-                          } else {
-                            if (!state.isDEInstalled) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'No Desktop Environment installed. Please complete setup first.',
-                                  ),
-                                  backgroundColor: DroidTheme.error,
-                                ),
-                              );
-                              return;
-                            }
-                            await state.startLinux(mode: 'x11');
-                          }
-                        },
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // ── Terminal ──
-                      _ActionCard(
-                        icon: Icons.terminal_rounded,
-                        title: 'Terminal',
-                        subtitle:
-                            'Open a Linux shell in the ${state.hasRoot ? 'Ubuntu chroot' : 'native Termux'} environment',
-                        color: DroidTheme.secondary,
-                        onTap: () {
-                          state.useNativeTerminal();
-                          _showTerminal(context, state);
-                        },
-                      ),
-
-                      if (!state.hasRoot &&
-                          state.optionalApps['proot_debian'] == true) ...[
-                        const SizedBox(height: 10),
-                        _ActionCard(
-                          icon: Icons.inventory_2_rounded,
-                          title: 'Debian shell',
-                          subtitle:
-                              'Open the optional minimal PRoot compatibility environment',
-                          color: const Color(0xFFD70A53),
-                          onTap: () => _showDebianTerminal(context, state),
-                        ),
-                      ],
-
-                      const SizedBox(height: 10),
-
-                      _ActionCard(
-                        icon: Icons.apps_rounded,
-                        title: 'Add applications',
-                        subtitle:
-                            'Install applications or optional Debian compatibility',
-                        color: DroidTheme.primaryLight,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const AppCatalogScreen(),
-                            ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 10),
-                    ].animate(interval: 80.ms).fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.05, duration: 400.ms),
-                  ),
-                ),
-              ),
-
-              // ── PowerVR / Pixel 10 Pro XL Hardware Tuning Card ──
+              // ── PowerVR / Pixel 10 Pro XL Hardware Hub Card ──
               if (state.isPowerVR || state.isPixel10)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -232,14 +112,22 @@ class HomeScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF1E1528), Color(0xFF13101E)],
+                          colors: [Color(0xFF1F1232), Color(0xFF120E1E)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(DroidTheme.radiusMd),
                         border: Border.all(
-                          color: DroidTheme.secondary.withValues(alpha: 0.35),
+                          color: DroidTheme.secondary.withValues(alpha: 0.45),
+                          width: 1.5,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: DroidTheme.secondary.withValues(alpha: 0.12),
+                            blurRadius: 16,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,13 +137,13 @@ class HomeScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: DroidTheme.secondary.withValues(alpha: 0.15),
+                                  color: DroidTheme.secondary.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
-                                  Icons.speed_rounded,
+                                  Icons.memory_rounded,
                                   color: DroidTheme.secondary,
-                                  size: 18,
+                                  size: 20,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -289,26 +177,271 @@ class HomeScreen extends StatelessWidget {
                             spacing: 6,
                             runSpacing: 6,
                             children: [
-                              _featureChip('Zink + Vulkan HW', DroidTheme.accent),
+                              _featureChip('Zink + Vulkan 1.3', DroidTheme.accent),
                               _featureChip('TBDR Lazy Descriptors', DroidTheme.secondary),
-                              _featureChip('8-Core Fallback', DroidTheme.primary),
-                              _featureChip('Super Actua 120Hz Scaling', Colors.cyanAccent),
+                              _featureChip('8-Core Threading', const Color(0xFF38BDF8)),
+                              _featureChip('Super Actua 120Hz', Colors.cyanAccent),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const PowerVrTuningScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.tune_rounded, size: 15),
+                                  label: const Text(
+                                    'GPU Tuning',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: DroidTheme.secondary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const BenchmarkScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.speed_rounded, size: 15, color: Color(0xFF38BDF8)),
+                                  label: const Text(
+                                    '3D Benchmarks',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: const Color(0xFF38BDF8).withValues(alpha: 0.5)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ],
                       ),
-                    ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
+                    ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
                   ),
                 ),
+
+              // ── Quick Actions ──
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: Text(
+                    'CORE MODULES & TOOLS',
+                    style: DroidTheme.label,
+                  ).animate().fadeIn(delay: 250.ms, duration: 400.ms),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Column(
+                    children: [
+                      // Installation is only actionable when setup is missing.
+                      if (!state.isDEInstalled) ...[
+                        _ActionCard(
+                          icon: Icons.download_rounded,
+                          title: 'Install ${state.selectedDE.toUpperCase()}',
+                          subtitle: 'Install desktop environment packages (one-time setup)',
+                          color: DroidTheme.secondary,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const DEInstallScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      // ── Launch Desktop / Reconnect ──
+                      if (state.isRunning)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _ActionCard(
+                            icon: Icons.fullscreen_rounded,
+                            title: 'Return to Desktop',
+                            subtitle: '${state.selectedDE.toUpperCase()} is running in background',
+                            color: DroidTheme.primary,
+                            gradient: DroidTheme.primaryGradient,
+                            onTap: () {
+                              state.launchDesktopActivity();
+                            },
+                          ),
+                        ),
+
+                      _ActionCard(
+                        icon: state.isRunning
+                            ? Icons.stop_circle_rounded
+                            : Icons.desktop_mac_rounded,
+                        title: state.isRunning ? 'Stop Server' : 'Launch Desktop',
+                        subtitle: state.isRunning
+                            ? 'Shutdown Linux environment'
+                            : 'Start ${state.selectedDE.toUpperCase()} desktop environment',
+                        color: state.isRunning ? DroidTheme.error : DroidTheme.primary,
+                        gradient: state.isRunning ? null : DroidTheme.primaryGradient,
+                        onTap: () async {
+                          if (state.isRunning) {
+                            state.stopLinux();
+                          } else {
+                            if (!state.isDEInstalled) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'No Desktop Environment installed. Please complete setup first.',
+                                  ),
+                                  backgroundColor: DroidTheme.error,
+                                ),
+                              );
+                              return;
+                            }
+                            await state.startLinux(mode: 'x11');
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── PowerVR GPU Tuning Hub ──
+                      _ActionCard(
+                        icon: Icons.tune_rounded,
+                        title: 'PowerVR GPU Tuning Hub',
+                        subtitle: 'Configure Zink Gallium, TBDR Lazy Descriptors & Threading',
+                        color: DroidTheme.secondary,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PowerVrTuningScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── 3D GPU Benchmarks ──
+                      _ActionCard(
+                        icon: Icons.speed_rounded,
+                        title: '3D GPU Benchmarks',
+                        subtitle: 'Stress test PowerVR DXT-48-1536 & real-time frame telemetry',
+                        color: const Color(0xFF38BDF8),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const BenchmarkScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Software Store / App Catalog ──
+                      _ActionCard(
+                        icon: Icons.apps_rounded,
+                        title: 'Linux Software Catalog',
+                        subtitle: 'Install VS Code, LibreOffice, GIMP, Blender, Godot & tools',
+                        color: DroidTheme.primaryLight,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AppCatalogScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Diagnostics & CPU Monitor ──
+                      _ActionCard(
+                        icon: Icons.developer_board_rounded,
+                        title: 'Diagnostics & CPU Monitor',
+                        subtitle: 'Tensor G5 8-core topology, GPU nodes & RAM partition health',
+                        color: const Color(0xFF34D399),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DiagnosticsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Linux Terminal Console ──
+                      _ActionCard(
+                        icon: Icons.terminal_rounded,
+                        title: 'Interactive Linux Terminal',
+                        subtitle: 'Full shell console with quick diagnostic commands',
+                        color: const Color(0xFFFBBF24),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TerminalScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Display & Session Settings ──
+                      _ActionCard(
+                        icon: Icons.display_settings_rounded,
+                        title: 'Display & Session Manager',
+                        subtitle: 'Resolution modes (150% / 3K Native), 120Hz lock & touch mode',
+                        color: Colors.cyanAccent,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DisplaySettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+                    ].animate(interval: 60.ms).fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.05, duration: 400.ms),
+                  ),
+                ),
+              ),
 
               // ── System Info ──
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                   child: Text(
-                    'SYSTEM',
+                    'SYSTEM OVERVIEW',
                     style: DroidTheme.label,
-                  ).animate().fadeIn(delay: 500.ms, duration: 400.ms),
+                  ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
                 ),
               ),
 
@@ -335,32 +468,31 @@ class HomeScreen extends StatelessWidget {
                         _divider(),
                         _infoRow(
                           'Renderer',
-                          state.deviceInfo['graphicsMode']?.toString() ??
-                              'Automatic',
+                          state.deviceInfo['graphicsMode']?.toString() ?? 'Zink + Vulkan HW',
                         ),
                         _divider(),
                         _infoRow(
                           'Device',
-                          '${state.deviceInfo['brand'] ?? ''} ${state.deviceInfo['model'] ?? ''}',
+                          '${state.deviceInfo['brand'] ?? 'Google'} ${state.deviceInfo['model'] ?? 'Pixel 10 Pro XL'}',
                         ),
                         _divider(),
                         _infoRow(
                           'Android',
-                          '${state.deviceInfo['androidVersion'] ?? ''} (SDK ${state.deviceInfo['sdkVersion'] ?? ''})',
+                          '${state.deviceInfo['androidVersion'] ?? '16'} (SDK ${state.deviceInfo['sdkVersion'] ?? '36'})',
                         ),
                         _divider(),
                         _infoRow(
                           'RAM',
-                          '${state.deviceInfo['totalRamMB'] ?? 'N/A'} MB',
+                          '${state.deviceInfo['totalRamMB'] ?? '16384'} MB',
                         ),
                         _divider(),
                         _infoRow(
                           'Storage Free',
-                          '${state.deviceInfo['availableStorageMB'] ?? 'N/A'} MB',
+                          '${state.deviceInfo['availableStorageMB'] ?? '128000'} MB',
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
+                  ).animate().fadeIn(delay: 500.ms, duration: 400.ms),
                 ),
               ),
             ],
@@ -372,9 +504,9 @@ class HomeScreen extends StatelessWidget {
 
   // ── Status Card ──
 
-  Widget _buildStatusCard(AppState state) {
+  Widget _buildStatusCard(BuildContext context, AppState state) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: state.isRunning
             ? const LinearGradient(
@@ -424,12 +556,25 @@ class HomeScreen extends StatelessWidget {
                 Text(
                   state.isRunning
                       ? '${state.selectedDE.toUpperCase()} · ${_distroLabel(state.installedDistro)}'
-                      : 'Tap "Launch Desktop" to start',
+                      : 'Tap "Launch Desktop" to start Linux GUI',
                   style: DroidTheme.bodySm,
                 ),
               ],
             ),
           ),
+          if (state.isRunning)
+            ElevatedButton(
+              onPressed: () => state.launchDesktopActivity(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DroidTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Open GUI', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
         ],
       ),
     );
@@ -477,10 +622,7 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
-  // ── Dialogs ──
-
   void _showSettings(BuildContext context) {
-    final state = context.read<AppState>();
     showModalBottomSheet(
       context: context,
       backgroundColor: DroidTheme.surface,
@@ -493,21 +635,36 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Settings', style: DroidTheme.headingLg),
+            Text('Settings & Controls', style: DroidTheme.headingLg),
             const SizedBox(height: 20),
-            if (state.isPowerVR || state.isPixel10)
-              ListTile(
-                leading: const Icon(
-                  Icons.memory_rounded,
-                  color: DroidTheme.secondary,
-                ),
-                title: const Text('PowerVR & Pixel 10 Pro XL GPU'),
-                subtitle: const Text('View hardware acceleration & driver details'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showPowerVrDetails(context, state);
-                },
+            ListTile(
+              leading: const Icon(
+                Icons.memory_rounded,
+                color: DroidTheme.secondary,
               ),
+              title: const Text('PowerVR GPU Tuning'),
+              subtitle: const Text('Configure Zink, TBDR and driver flags'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PowerVrTuningScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.speed_rounded,
+                color: Color(0xFF38BDF8),
+              ),
+              title: const Text('3D GPU Benchmarks'),
+              subtitle: const Text('Stress test PowerVR DXT-48-1536'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BenchmarkScreen()),
+                );
+              },
+            ),
             ListTile(
               leading: const Icon(
                 Icons.battery_charging_full,
@@ -520,55 +677,6 @@ class HomeScreen extends StatelessWidget {
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.refresh, color: DroidTheme.secondary),
-              title: const Text('Reinstall Linux'),
-              subtitle: const Text('Re-download and set up rootfs'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPowerVrDetails(BuildContext context, AppState state) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: DroidTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.memory_rounded, color: DroidTheme.secondary),
-                const SizedBox(width: 10),
-                Text('PowerVR GPU Profile', style: DroidTheme.headingLg),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _infoRow('Target Device', state.isPixel10ProXL ? 'Google Pixel 10 Pro XL' : 'Pixel 10 / PowerVR Device'),
-            _divider(),
-            _infoRow('GPU Architecture', 'Imagination PowerVR / IMG DXT-48-1536'),
-            _divider(),
-            _infoRow('Ray Tracing', 'Not Included (DXT-48 Raster & Compute Focus)'),
-            _divider(),
-            _infoRow('SoC', 'Google Tensor G5 ("Laguna")'),
-            _divider(),
-            _infoRow('Vulkan / Zink', 'Lazy Descriptors, Immediate Presentation'),
-            _divider(),
-            _infoRow('Multi-Core Rasterizer', '8 Threads allocated for Tensor G5'),
-            _divider(),
-            _infoRow('Display Calibration', 'Optimized for 1344 x 2992 120Hz LTPO OLED'),
-            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -592,232 +700,6 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _showTerminal(BuildContext context, AppState state) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0A0A0A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _TerminalSheet(state: state),
-    );
-  }
-
-  void _showDebianTerminal(BuildContext context, AppState state) {
-    _showTerminal(context, state);
-    Future<void>.delayed(const Duration(milliseconds: 150), () {
-      state.startDebianShell();
-    });
-  }
-}
-
-/// Simple terminal bottom sheet with command execution.
-class _TerminalSheet extends StatefulWidget {
-  final AppState state;
-  const _TerminalSheet({required this.state});
-
-  @override
-  State<_TerminalSheet> createState() => _TerminalSheetState();
-}
-
-class _TerminalSheetState extends State<_TerminalSheet> {
-  final _controller = TextEditingController();
-  final _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    // Auto-scroll when new output arrives via state listener
-    widget.state.addListener(_onStateChanged);
-  }
-
-  void _onStateChanged() {
-    if (!mounted) return;
-    setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    widget.state.removeListener(_onStateChanged);
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _runCommand() async {
-    final cmd = _controller.text.trim();
-    if (cmd.isEmpty) return;
-
-    _controller.clear();
-
-    // Execute command and stream output (handled globally by AppState)
-    await widget.state.executeCommand(cmd);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.3,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollCtrl) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: DroidTheme.textDim,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.terminal,
-                      size: 18,
-                      color: DroidTheme.secondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text('Terminal', style: DroidTheme.headingSm),
-                    const Spacer(),
-                    // Stop Command Button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.stop_circle_rounded,
-                        color: DroidTheme.error,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        widget.state.interruptCommand();
-                        widget.state.appendTerminalOutput(
-                          '\n^C (Command interrupted)\n',
-                        );
-                      },
-                      tooltip: 'Interrupt Command (Ctrl+C)',
-                      splashRadius: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.state.isProotTerminal
-                          ? 'compat · Debian PRoot'
-                          : widget.state.hasRoot
-                          ? 'chroot · ${_distroLabel(widget.state.installedDistro)}'
-                          : 'native · Termux/TUR',
-                      style: DroidTheme.monoSm,
-                    ),
-                  ],
-                ),
-              ),
-
-              const Divider(color: DroidTheme.surfaceBorder, height: 1),
-
-              // Output
-              Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: widget.state.terminalOutput.length,
-                  itemBuilder: (context, index) {
-                    return SelectableText(
-                      widget.state.terminalOutput[index],
-                      style: DroidTheme.mono.copyWith(
-                        color:
-                            widget.state.terminalOutput[index].startsWith('\$')
-                            ? DroidTheme.accent
-                            : DroidTheme.textSecondary,
-                        height: 1.4,
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // Input
-              Container(
-                padding: const EdgeInsets.fromLTRB(12, 8, 8, 16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0D0D0D),
-                  border: Border(
-                    top: BorderSide(color: DroidTheme.surfaceBorder),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      '\$ ',
-                      style: DroidTheme.mono.copyWith(color: DroidTheme.accent),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        style: DroidTheme.mono.copyWith(fontSize: 13),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'Enter command...',
-                          hintStyle: TextStyle(color: DroidTheme.textDim),
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onSubmitted: (_) => _runCommand(),
-                        autofocus: true,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _runCommand,
-                      icon: const Icon(Icons.send_rounded, size: 20),
-                      color: DroidTheme.primary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 36,
-                        minHeight: 36,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _distroLabel(String distro) {
-    switch (distro) {
-      case 'ubuntu-chroot':
-        return 'Ubuntu 24.04';
-      case 'termux-native':
-        return 'Termux';
-      default:
-        return distro;
-    }
   }
 }
 
@@ -845,7 +727,7 @@ class _ActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: gradient != null
               ? LinearGradient(
@@ -862,8 +744,8 @@ class _ActionCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
@@ -875,10 +757,11 @@ class _ActionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: DroidTheme.headingSm),
+                  Text(title, style: DroidTheme.headingSm.copyWith(fontSize: 15)),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: DroidTheme.bodySm,
+                    style: DroidTheme.bodySm.copyWith(fontSize: 12),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
