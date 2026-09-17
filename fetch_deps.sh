@@ -13,35 +13,52 @@ PACKAGES=(
     "l/libffi/libffi_3.4.6_aarch64.deb"
 )
 
-# Output directories
-JNILIBS_DIR="/Users/orailnoor/workspace/DroidDesk/app/android/app/src/main/jniLibs/arm64-v8a"
-INCLUDE_DIR="/Users/orailnoor/workspace/DroidDesk/app/android/app/src/main/cpp/include"
+# Output directories (relative to repository root)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JNILIBS_DIR="$SCRIPT_DIR/app/android/app/src/main/jniLibs/arm64-v8a"
+INCLUDE_DIR="$SCRIPT_DIR/app/android/app/src/main/cpp/include"
 
 mkdir -p "$JNILIBS_DIR"
 mkdir -p "$INCLUDE_DIR"
-mkdir -p /tmp/wlroots_deps
-cd /tmp/wlroots_deps
+WORK_DIR="/tmp/wlroots_deps_$$"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
 for pkg in "${PACKAGES[@]}"; do
     filename=$(basename "$pkg")
     echo "Downloading $filename..."
     curl -sL "$URL_BASE/$pkg" -o "$filename"
     
-    # Extract using bsdtar (macOS compatible)
-    bsdtar -xf "$filename"
-    bsdtar -xf data.tar.xz
+    # Extract using dpkg-deb (Linux), bsdtar (macOS), or standard ar + tar
+    mkdir -p ./pkg_extracted
+    if command -v dpkg-deb >/dev/null 2>&1; then
+        dpkg-deb -x "$filename" ./pkg_extracted
+    elif command -v bsdtar >/dev/null 2>&1; then
+        bsdtar -xf "$filename"
+        if [ -f data.tar.xz ]; then bsdtar -xf data.tar.xz -C ./pkg_extracted; fi
+        if [ -f data.tar.gz ]; then bsdtar -xf data.tar.gz -C ./pkg_extracted; fi
+    else
+        ar -x "$filename"
+        if [ -f data.tar.xz ]; then tar -xf data.tar.xz -C ./pkg_extracted; fi
+        if [ -f data.tar.gz ]; then tar -xf data.tar.gz -C ./pkg_extracted; fi
+    fi
     
     # Copy shared libraries
-    find ./data/data/com.termux/files/usr/lib -name "*.so*" -type f -exec cp {} "$JNILIBS_DIR/" \;
-    find ./data/data/com.termux/files/usr/lib -name "*.so*" -type l -exec cp -a {} "$JNILIBS_DIR/" \;
+    if [ -d "./pkg_extracted/data/data/com.termux/files/usr/lib" ]; then
+        find ./pkg_extracted/data/data/com.termux/files/usr/lib -name "*.so*" -type f -exec cp {} "$JNILIBS_DIR/" \;
+        find ./pkg_extracted/data/data/com.termux/files/usr/lib -name "*.so*" -type l -exec cp -a {} "$JNILIBS_DIR/" \;
+    fi
     
     # Copy headers
-    if [ -d "./data/data/com.termux/files/usr/include" ]; then
-        cp -r ./data/data/com.termux/files/usr/include/* "$INCLUDE_DIR/"
+    if [ -d "./pkg_extracted/data/data/com.termux/files/usr/include" ]; then
+        cp -r ./pkg_extracted/data/data/com.termux/files/usr/include/* "$INCLUDE_DIR/"
     fi
     
     # Clean up for next package
-    rm -rf data control.tar.xz data.tar.xz debian-binary
+    rm -rf pkg_extracted data control.tar.* data.tar.* debian-binary "$filename"
 done
+
+cd "$SCRIPT_DIR"
+rm -rf "$WORK_DIR"
 
 echo "Done fetching wlroots dependencies!"

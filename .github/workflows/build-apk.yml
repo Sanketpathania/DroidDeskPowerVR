@@ -22,22 +22,30 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK & NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android NDK & CMake
-        run: |
-          sdkmanager --install "ndk;25.2.9519653" "cmake;3.22.1"
-
-      - name: Set up Flutter
+      - name: Set up Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Fetch Dependencies
+      - name: Set up Android NDK (r26b)
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26b
+          link-to-sdk: true
+
+      - name: Accept Android SDK Licenses
         run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Fetch Native wlroots Dependencies
+        run: |
+          chmod +x ./fetch_deps.sh
           ./fetch_deps.sh || true
+
+      - name: Resolve Flutter Dependencies
+        run: |
           cd app
           flutter pub get
 
@@ -45,10 +53,13 @@ jobs:
         run: |
           cd app
           flutter build apk --release
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
 
-      - name: Upload APK Artifact
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: DroidDesk-Pixel10-PowerVR-APK
+          name: DroidDesk-Pixel10-PowerVR-Release-APK
           path: app/build/app/outputs/flutter-apk/*.apk
           retention-days: 30
