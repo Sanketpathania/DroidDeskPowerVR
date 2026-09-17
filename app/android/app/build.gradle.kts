@@ -20,7 +20,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -33,6 +33,13 @@ android {
         ndk {
             // ARM64 only — all modern Android phones
             abiFilters += listOf("arm64-v8a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                cppFlags += listOf("-Wl,-z,max-page-size=16384")
+            }
         }
     }
 
@@ -65,8 +72,6 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
-            arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
-            cppFlags += "-Wl,-z,max-page-size=16384"
         }
     }
 
