@@ -26,6 +26,15 @@ if [ ! -f "app/assets/bootstrap-aarch64.zip" ] || [ ! -s "app/assets/bootstrap-a
     curl -L --retry 3 "https://github.com/termux/termux-packages/releases/download/bootstrap-2026.09.13-r1%2Bapt.android-7/bootstrap-aarch64.zip" -o "app/assets/bootstrap-aarch64.zip"
 fi
 
+# Ensure stable release keystore
+if [ ! -f "app/android/app/release.keystore" ]; then
+    echo "[*] Generating release keystore..."
+    mkdir -p app/android/app
+    openssl req -x509 -newkey rsa:2048 -keyout /tmp/key.pem -out /tmp/cert.pem -days 10000 -nodes -subj "/CN=DroidDesk/O=DroidDesk/C=US"
+    openssl pkcs12 -export -out app/android/app/release.keystore -inkey /tmp/key.pem -in /tmp/cert.pem -name droiddesk -password pass:droiddesk_release_password
+    rm -f /tmp/key.pem /tmp/cert.pem
+fi
+
 echo "[*] Resolving Flutter packages..."
 cd app
 flutter pub get

@@ -36,11 +36,23 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystore = file("release.keystore")
+            if (keystore.exists()) {
+                storeFile = keystore
+                storePassword = "droiddesk_release_password"
+                keyAlias = "droiddesk"
+                keyPassword = "droiddesk_release_password"
+            } else {
+                storeFile = signingConfigs.getByName("debug").storeFile
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // GitHub-distributed testing builds intentionally use Android's
-            // debug key so release APKs are directly installable.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
