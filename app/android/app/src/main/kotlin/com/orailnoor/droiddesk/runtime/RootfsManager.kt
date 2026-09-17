@@ -49,6 +49,7 @@ class RootfsManager(private val context: Context) {
     private val downloadDir: File get() = File(baseDir, "downloads")
     private val configFile: File get() = File(baseDir, "distro.conf")
     private val deConfigFile: File get() = File(baseDir, "de.conf")
+    private val rootShell = RootShell(context)
 
     // ── Status ──
 
@@ -207,18 +208,90 @@ class RootfsManager(private val context: Context) {
         connection.disconnect()
     }
 
-    // ── Extraction ──
+    // ── Extraction & Cleanup ──
+
+    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+
+    /**
+     * Force clean any previous rootfs installation, safely terminating lingering
+     * processes, unmounting all chroot kernel mounts, and removing leftover files.
+     */
+    fun forceCleanRootfs() {
+        Log.i(TAG, "Force cleaning existing rootfs at ${rootfsDir.absolutePath}...")
+        val hasRoot = rootShell.hasRoot()
+        val path = rootfsDir.absolutePath
+
+        if (hasRoot) {
+            try {
+                // 1. Terminate any running processes holding files inside rootfs
+                rootShell.exec("fuser -k -9 -m $path 2>/dev/null || pkill -9 -f $path 2>/dev/null || true")
+
+                // 2. Unmount all child mounts under rootfsDir in reverse depth order
+                val mountsOutput = try { rootShell.exec("cat /proc/mounts") } catch (_: Exception) { "" }
+                val rootfsMounts = mountsOutput.lines()
+                    .mapNotNull { line ->
+                        val parts = line.split("\\s+".toRegex())
+                        if (parts.size >= 2) parts[1] else null
+                    }
+                    .filter { it == path || it.startsWith("$path/") }
+                    .sortedByDescending { it.length }
+
+                for (mountPoint in rootfsMounts) {
+                    try {
+                        rootShell.exec("umount -l $mountPoint 2>/dev/null || umount $mountPoint 2>/dev/null || true")
+                        Log.i(TAG, "Unmounted: $mountPoint")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed unmounting $mountPoint: ${e.message}")
+                    }
+                }
+
+                // Explicit unmount for known mounts
+                val standardMounts = listOf(
+                    "tmp/.X11-unix", "dev/pts", "dev/shm", "dev", "proc", "sys", "run", "tmp", "mnt/android", "mnt/sdcard"
+                )
+                for (sub in standardMounts) {
+                    val target = File(rootfsDir, sub).absolutePath
+                    try {
+                        rootShell.exec("umount -l $target 2>/dev/null || true")
+                    } catch (_: Exception) {}
+                }
+
+                // 3. Force recursive deletion with root permissions
+                rootShell.exec("rm -rf $path 2>/dev/null || true")
+                rootShell.exec("mkdir -p $path && chmod 755 $path")
+            } catch (e: Exception) {
+                Log.w(TAG, "Root-based clean failed, falling back to standard clean: ${e.message}")
+            }
+        }
+
+        // Standard fallback if directory still exists
+        try {
+            if (rootfsDir.exists()) {
+                rootfsDir.deleteRecursively()
+            }
+            rootfsDir.mkdirs()
+        } catch (e: Exception) {
+            Log.w(TAG, "Standard clean completed with warnings: ${e.message}")
+        }
+
+        // Clear marker files from previous installations
+        try {
+            File(context.filesDir, "SETUP_COMPLETE").delete()
+            File(rootfsDir, ".chroot_de_installed").delete()
+            File(context.filesDir, "de.conf").delete()
+        } catch (_: Exception) {}
+    }
 
     /**
      * Extract the downloaded rootfs tarball.
-     * Uses the system's tar command (available on Android via toybox).
+     * Uses root tar when available for accurate permissions, or Android system tar as fallback.
      */
     fun extractRootfs(
         onProgress: (progress: Double, status: String) -> Unit
     ) {
         thread(name = "rootfs-extract") {
             try {
-                val distro = getInstalledDistro()
+                val distro = getInstalledDistro().ifEmpty { "ubuntu" }
                 val tarball = File(downloadDir, "${distro}-rootfs.tar." + (if (distro == "kali") "xz" else "gz"))
 
                 if (!tarball.exists()) {
@@ -226,46 +299,66 @@ class RootfsManager(private val context: Context) {
                     return@thread
                 }
 
-                // Clean previous rootfs
-                if (rootfsDir.exists()) {
-                    rootfsDir.deleteRecursively()
-                }
-                rootfsDir.mkdirs()
+                onProgress(0.05, "Cleaning previous installation...")
+                forceCleanRootfs()
 
-                onProgress(0.1, "Extracting ${DISTRO_NAMES[distro]}...")
+                onProgress(0.1, "Extracting ${DISTRO_NAMES[distro] ?: distro}...")
                 Log.i(TAG, "Extracting rootfs from ${tarball.absolutePath}")
 
-                // Use ProcessBuilder to run tar extraction
-                // Android's toybox includes tar, and we can use xz if available
                 val ext = if (distro == "kali") "xz" else "gz"
                 val tarFlags = if (ext == "xz") "Jxf" else "zxf"
-                val process = ProcessBuilder(
-                    "tar", tarFlags, tarball.absolutePath,
-                    "-C", rootfsDir.absolutePath
-                )
-                    .redirectErrorStream(true)
-                    .start()
+                val hasRoot = rootShell.hasRoot()
+                val su = if (hasRoot) rootShell.findSuPath() else null
 
-                // Read output for progress indication
-                val reader = process.inputStream.bufferedReader()
-                var line: String?
-                var lineCount = 0
-                var lastLine = ""
-                while (reader.readLine().also { line = it } != null) {
-                    lastLine = line!!
-                    if (lineCount % 500 == 0) {
-                        onProgress(0.1 + (lineCount % 5000) / 10000.0, "Extracting: $line")
+                if (su != null) {
+                    val cmd = "$su -c \"tar -$tarFlags ${shellQuote(tarball.absolutePath)} -C ${shellQuote(rootfsDir.absolutePath)}\""
+                    Log.i(TAG, "Running root tar extraction: $cmd")
+                    val process = ProcessBuilder("sh", "-c", cmd)
+                        .redirectErrorStream(true)
+                        .start()
+
+                    val reader = process.inputStream.bufferedReader()
+                    var line: String?
+                    var lineCount = 0
+                    while (reader.readLine().also { line = it } != null) {
+                        if (lineCount % 200 == 0) {
+                            onProgress(0.1 + (lineCount % 5000) / 10000.0, "Extracting: $line")
+                        }
+                        lineCount++
                     }
-                    lineCount++
+                    process.waitFor()
+                } else {
+                    val process = ProcessBuilder(
+                        "tar", tarFlags, tarball.absolutePath,
+                        "-C", rootfsDir.absolutePath
+                    )
+                        .redirectErrorStream(true)
+                        .start()
+
+                    val reader = process.inputStream.bufferedReader()
+                    var line: String?
+                    var lineCount = 0
+                    var lastLine = ""
+                    while (reader.readLine().also { line = it } != null) {
+                        lastLine = line!!
+                        if (lineCount % 500 == 0) {
+                            onProgress(0.1 + (lineCount % 5000) / 10000.0, "Extracting: $line")
+                        }
+                        lineCount++
+                    }
+
+                    val exitCode = process.waitFor()
+                    val binDir = File(rootfsDir, "bin")
+                    if (exitCode != 0 && (!binDir.exists() || binDir.list()?.isEmpty() == true)) {
+                        throw RuntimeException("tar failed (code $exitCode): $lastLine")
+                    }
                 }
 
-                val exitCode = process.waitFor()
                 val binDir = File(rootfsDir, "bin")
-                
-                // Android's tar will fail (code 1 or 2) when trying to chown files to root or create /dev nodes.
-                // We ignore this as long as the core filesystem extracted successfully.
-                if (exitCode != 0 && (!binDir.exists() || binDir.list()?.isEmpty() == true)) {
-                    throw RuntimeException("tar failed (code $exitCode): $lastLine")
+                val usrDir = File(rootfsDir, "usr")
+                if ((!binDir.exists() || binDir.list()?.isEmpty() == true) &&
+                    (!usrDir.exists() || usrDir.list()?.isEmpty() == true)) {
+                    throw RuntimeException("Rootfs extraction produced an empty filesystem. Please retry.")
                 }
 
                 onProgress(0.7, "Configuring Linux environment...")

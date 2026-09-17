@@ -108,6 +108,10 @@ class DroidDeskPlatform {
     return await _channel.invokeMethod<bool>('extractRootfs') ?? false;
   }
 
+  static Future<bool> resetRootfs() async {
+    return await _channel.invokeMethod<bool>('resetRootfs') ?? false;
+  }
+
   static Future<bool> installDesktopEnvironment(String de) async {
     return await _channel.invokeMethod<bool>('installDesktopEnvironment', {
           'de': de,

@@ -1337,6 +1337,19 @@ class LinuxRuntime(private val context: Context) {
         return isMinimalDebianInstalled()
     }
 
+    private fun clearAptLocks() {
+        listOf(
+            File(prefixDir, "var/lib/dpkg/lock"),
+            File(prefixDir, "var/lib/dpkg/lock-frontend"),
+            File(prefixDir, "var/lib/apt/lists/lock"),
+            File(prefixDir, "var/cache/apt/archives/lock")
+        ).forEach { file ->
+            if (file.exists()) {
+                try { file.delete() } catch (_: Exception) {}
+            }
+        }
+    }
+
     fun installDesktopEnvironmentNative(
         desktopEnv: String = "xfce4",
         onProgress: ((Double, String) -> Unit)? = null,
@@ -1358,6 +1371,7 @@ class LinuxRuntime(private val context: Context) {
         patchShebangs()
         patchElfRunpaths(prefixDir)
         compileSocketHook()
+        clearAptLocks()
         onProgress?.invoke(0.12, "Configuring X11 and TUR repositories...")
 
         // Install the x11/tur repository packages. Their postinst scripts run
@@ -1373,6 +1387,8 @@ class LinuxRuntime(private val context: Context) {
         // Finish configuring anything left over from a previous run, then install
         // the desktop, GPU drivers, and build tools. Each install is followed by a
         // shebang patch + configure pass so postinst scripts find our prefix.
+        clearAptLocks()
+        installPackageGroup("apt-get --fix-broken install -y")
         if (!installPackageGroup("dpkg --configure -a")) {
             Log.e(TAG, "Initial dpkg --configure -a failed")
             return false

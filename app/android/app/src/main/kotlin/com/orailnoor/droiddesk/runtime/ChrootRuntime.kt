@@ -82,6 +82,15 @@ class ChrootRuntime(private val context: Context) {
         }
     }
 
+    /**
+     * Force-clean existing rootfs, stopping any running session and unmounting all filesystems.
+     */
+    fun forceCleanRootfs() {
+        stopSession()
+        unmountAll()
+        rootfsManager.forceCleanRootfs()
+    }
+
     private fun configureChrootRootfs() {
         Log.i(TAG, "Applying chroot-specific rootfs configuration")
 
@@ -183,9 +192,18 @@ class ChrootRuntime(private val context: Context) {
                 onProgress(0.0, "Mounting rootfs...")
                 ensureMounts()
 
+                onProgress(0.02, "Clearing package locks & recovering state...")
+                execChroot("""
+                    killall -9 apt apt-get dpkg 2>/dev/null || true
+                    rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock*
+                    dpkg --configure -a || true
+                    apt-get --fix-broken install -y || true
+                """.trimIndent(), onLog)
+
                 onProgress(0.05, "Updating package lists...")
                 if (execChroot("apt-get update -y", onLog) != 0) {
-                    throw IllegalStateException("Package index update failed")
+                    Log.w(TAG, "First apt-get update returned non-zero, retrying after dpkg repair...")
+                    execChroot("dpkg --configure -a && apt-get update -y", onLog)
                 }
 
                 onProgress(0.1, "Installing core tools...")
@@ -460,7 +478,25 @@ class ChrootRuntime(private val context: Context) {
      */
     fun unmountAll() {
         if (!hasRoot()) return
-        val mounts = rootShell.exec("mount").lines()
+        val path = rootfsDir.absolutePath
+        val mountsOutput = try { rootShell.exec("cat /proc/mounts") } catch (_: Exception) { "" }
+        val rootfsMounts = mountsOutput.lines()
+            .mapNotNull { line ->
+                val parts = line.split("\\s+".toRegex())
+                if (parts.size >= 2) parts[1] else null
+            }
+            .filter { it == path || it.startsWith("$path/") }
+            .sortedByDescending { it.length }
+
+        for (mountPoint in rootfsMounts) {
+            try {
+                rootShell.exec("umount -l $mountPoint 2>/dev/null || umount $mountPoint 2>/dev/null || true")
+                Log.i(TAG, "Unmounted $mountPoint")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to unmount $mountPoint: ${e.message}")
+            }
+        }
+
         val targets = listOf(
             File(rootfsDir, "tmp/.X11-unix").absolutePath,
             File(rootfsDir, "dev/pts").absolutePath,
@@ -473,14 +509,9 @@ class ChrootRuntime(private val context: Context) {
         )
         // Unmount in reverse order, be tolerant of busy mounts
         targets.reversed().forEach { target ->
-            if (mounts.any { it.contains(" on $target ") }) {
-                try {
-                    rootShell.exec("umount -l $target 2>/dev/null || umount $target 2>/dev/null || true")
-                    Log.i(TAG, "Unmounted $target")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to unmount $target: ${e.message}")
-                }
-            }
+            try {
+                rootShell.exec("umount -l $target 2>/dev/null || umount $target 2>/dev/null || true")
+            } catch (_: Exception) {}
         }
     }
 

@@ -249,6 +249,17 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "resetRootfs" -> {
+                    thread {
+                        try {
+                            chrootRuntime.forceCleanRootfs()
+                            runOnUiThread { result.success(true) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.success(false) }
+                        }
+                    }
+                }
+
                 "installDesktopEnvironment" -> {
                     val desktopEnv = call.argument<String>("de") ?: "xfce4"
                     thread {
