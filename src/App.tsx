@@ -27,8 +27,11 @@ import {
   ShieldCheck,
   RotateCcw,
   Clock,
-  BatteryCharging
+  BatteryCharging,
+  Gauge,
+  Box
 } from 'lucide-react';
+import BenchmarkTab from './components/BenchmarkTab';
 
 interface AppPackage {
   id: string;
@@ -115,7 +118,7 @@ const INITIAL_PACKAGES: AppPackage[] = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'display' | 'powervr' | 'packages' | 'terminal' | 'diagnostics' | 'build'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'display' | 'powervr' | 'benchmarks' | 'packages' | 'terminal' | 'diagnostics' | 'build'>('overview');
   const [isRunning, setIsRunning] = useState(true);
   const [selectedDE, setSelectedDE] = useState<'xfce4' | 'lxqt' | 'mate' | 'plasma'>('xfce4');
   const [resolutionMode, setResolutionMode] = useState<'200%' | '150%' | '100%' | '1080p'>('200%');
@@ -350,6 +353,7 @@ export default function App() {
             { id: 'overview', label: 'Overview', icon: Monitor },
             { id: 'display', label: 'Display & Session', icon: Maximize2 },
             { id: 'powervr', label: 'PowerVR GPU Tuning', icon: Zap },
+            { id: 'benchmarks', label: '3D Benchmarks', icon: Gauge },
             { id: 'packages', label: 'App Catalog', icon: FolderOpen },
             { id: 'terminal', label: 'Terminal Console', icon: Terminal },
             { id: 'diagnostics', label: 'Diagnostics & CPU', icon: Activity },
@@ -413,14 +417,20 @@ export default function App() {
 
                 <div className="flex flex-col gap-2 min-w-[200px]">
                   <button
+                    onClick={() => setActiveTab('benchmarks')}
+                    className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:opacity-90 text-white text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-cyan-900/30"
+                  >
+                    <Gauge className="w-4 h-4 text-amber-300" /> Run 3D Benchmark
+                  </button>
+                  <button
                     onClick={() => setActiveTab('powervr')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="w-full py-2 px-4 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
                   >
                     <Zap className="w-4 h-4" /> PowerVR Tuning Hub
                   </button>
                   <button
                     onClick={() => setActiveTab('display')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 border border-white/10 text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="w-full py-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 border border-white/10 text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
                   >
                     <Monitor className="w-4 h-4" /> Live Session View
                   </button>
@@ -897,6 +907,9 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* 3D RENDERING BENCHMARKS TAB */}
+        {activeTab === 'benchmarks' && <BenchmarkTab />}
 
         {/* APP CATALOG TAB */}
         {activeTab === 'packages' && (
