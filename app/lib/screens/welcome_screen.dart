@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:droiddesk/theme/droid_theme.dart';
-import 'package:droiddesk/screens/setup/de_picker.dart';
+import 'package:droiddesk/screens/setup/distro_picker.dart';
 
 /// Welcome screen — first thing the user sees.
 /// Premium, animated landing with the DroidDesk brand.
@@ -141,7 +141,7 @@ class WelcomeScreen extends StatelessWidget {
                             PageRouteBuilder(
                               pageBuilder:
                                   (context, animation, secondaryAnimation) =>
-                                      const DEPickerScreen(),
+                                      const DistroPickerScreen(),
                               transitionsBuilder:
                                   (
                                     context,

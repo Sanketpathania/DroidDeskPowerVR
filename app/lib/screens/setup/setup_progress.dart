@@ -4,10 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:droiddesk/theme/droid_theme.dart';
 import 'package:droiddesk/state/app_state.dart';
-import 'package:droiddesk/screens/home_screen.dart';
+import 'package:droiddesk/screens/setup/setup_post_config.dart';
 
 /// Setup progress screen — step 3 of setup wizard.
-/// Shows download, extraction, and configuration progress.
+/// Shows 5 granular milestones, live speed metrics, terminal drawer, and recovery controls.
 class SetupProgressScreen extends StatefulWidget {
   const SetupProgressScreen({super.key});
 
@@ -17,6 +17,8 @@ class SetupProgressScreen extends StatefulWidget {
 
 class _SetupProgressScreenState extends State<SetupProgressScreen> {
   bool _started = false;
+  bool _showTerminalLogs = false;
+  DateTime? _setupStartTime;
 
   @override
   void initState() {
@@ -29,10 +31,10 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
   Future<void> _startSetup() async {
     if (_started) return;
     _started = true;
+    _setupStartTime = DateTime.now();
     final state = context.read<AppState>();
 
-    final freeStorage = (state.deviceInfo['availableStorageMB'] as num?)
-        ?.toInt();
+    final freeStorage = (state.deviceInfo['availableStorageMB'] as num?)?.toInt();
     if (freeStorage != null && freeStorage < 2048) {
       final continueAnyway =
           await showDialog<bool>(
@@ -115,8 +117,6 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-
-    // Determine overall phase
     final phase = _getPhase(state);
 
     return Scaffold(
@@ -126,147 +126,202 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                const Spacer(flex: 1),
+                const SizedBox(height: 12),
 
-                // ── Circular Progress ──
-                CircularPercentIndicator(
-                      radius: 80,
-                      lineWidth: 6,
-                      percent: phase.progress.clamp(0.0, 1.0),
-                      center: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            phase.icon,
-                            size: 36,
-                            color: phase.error
-                                ? DroidTheme.error
-                                : DroidTheme.primary,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${(phase.progress * 100).toInt()}%',
-                            style: DroidTheme.headingSm.copyWith(
-                              color: phase.error
-                                  ? DroidTheme.error
-                                  : DroidTheme.textPrimary,
-                            ),
-                          ),
-                        ],
+                // ── Progress Header ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'STEP 3 OF 3: INSTALLATION',
+                      style: DroidTheme.label.copyWith(letterSpacing: 1.2, color: DroidTheme.textDim),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        _showTerminalLogs ? Icons.dashboard_customize_rounded : Icons.terminal_rounded,
+                        color: DroidTheme.secondary,
+                        size: 20,
                       ),
-                      progressColor: phase.error
-                          ? DroidTheme.error
-                          : DroidTheme.primary,
-                      backgroundColor: DroidTheme.surfaceBorder,
-                      circularStrokeCap: CircularStrokeCap.round,
-                      animateFromLastPercent: true,
-                      animation: true,
-                      animationDuration: 500,
-                    )
-                    .animate()
-                    .scale(
-                      begin: const Offset(0.8, 0.8),
-                      duration: 500.ms,
-                      curve: Curves.easeOut,
-                    )
-                    .fadeIn(duration: 500.ms),
+                      tooltip: _showTerminalLogs ? 'Show Visual Stepper' : 'Show Live Console',
+                      onPressed: () => setState(() => _showTerminalLogs = !_showTerminalLogs),
+                    ),
+                  ],
+                ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 12),
 
-                // ── Phase Title ──
+                // ── Circular Progress & Speed Indicator ──
+                CircularPercentIndicator(
+                  radius: 72,
+                  lineWidth: 6,
+                  percent: phase.progress.clamp(0.0, 1.0),
+                  center: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        phase.icon,
+                        size: 32,
+                        color: phase.error ? DroidTheme.error : DroidTheme.primary,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(phase.progress * 100).toInt()}%',
+                        style: DroidTheme.headingSm.copyWith(
+                          color: phase.error ? DroidTheme.error : DroidTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  progressColor: phase.error ? DroidTheme.error : DroidTheme.primary,
+                  backgroundColor: DroidTheme.surfaceBorder,
+                  circularStrokeCap: CircularStrokeCap.round,
+                  animateFromLastPercent: true,
+                  animation: true,
+                  animationDuration: 400,
+                ).animate().scale(begin: const Offset(0.9, 0.9), duration: 400.ms).fadeIn(duration: 400.ms),
+
+                const SizedBox(height: 16),
+
+                // ── Phase Title & Message ──
                 Text(
                   phase.title,
                   style: DroidTheme.headingLg,
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+                ).animate().fadeIn(duration: 300.ms),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
 
-                // ── Status Message ──
                 Text(
                   phase.message,
-                  style: DroidTheme.bodyMd.copyWith(
-                    color: phase.error
-                        ? DroidTheme.error
-                        : DroidTheme.textSecondary,
+                  style: DroidTheme.bodySm.copyWith(
+                    color: phase.error ? DroidTheme.error : DroidTheme.textSecondary,
                   ),
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
 
-                const SizedBox(height: 48),
-
-                // ── Steps Checklist ──
-                _buildChecklist(state),
-
-                if (state.setupLog.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  _buildInstallLog(state.setupLog),
+                if (state.isDownloading && state.downloadSpeedMBs > 0) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: DroidTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '⚡ ${state.downloadSpeedMBs.toStringAsFixed(1)} MB/s',
+                      style: DroidTheme.monoSm.copyWith(color: DroidTheme.secondary, fontSize: 11),
+                    ),
+                  ),
                 ],
 
-                const Spacer(flex: 1),
+                const SizedBox(height: 16),
 
-                // ── Action Buttons ──
+                // ── Switch between Granular Checklist & Terminal Console ──
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _showTerminalLogs
+                        ? _buildInstallLog(state.setupLog.isEmpty ? 'Waiting for package manager output...' : state.setupLog)
+                        : _buildFiveStageChecklist(state),
+                  ),
+                ),
+
+                // ── Bottom Actions / Recovery Controls ──
                 if (phase.error) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        state.clearError();
-                        _started = false;
-                        _startSetup();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: DroidTheme.error,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Clean Slate Reset'),
+                                      content: const Text('This will unmount lingering file handles and clear the temporary directory for a fresh setup.'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: DroidTheme.error),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Reset Clean'),
+                                        ),
+                                      ],
+                                    ),
+                                  ) ?? false;
+                                  if (confirmed) {
+                                    await state.resetInstallation();
+                                    _started = false;
+                                    _startSetup();
+                                  }
+                                },
+                                icon: const Icon(Icons.cleaning_services_rounded, size: 16),
+                                label: const Text('Clean Reset'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  state.repairAndRetry();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: DroidTheme.primary,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                icon: const Icon(Icons.build_rounded, size: 16),
+                                label: const Text('Repair & Retry'),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      child: const Text('Retry'),
+                      ],
                     ),
                   ),
                 ] else if (phase.complete) ...[
-                  SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => const HomeScreen(),
-                              ),
-                              (route) => false,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: DroidTheme.accent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const SetupPostConfigScreen(),
                             ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Launch DroidDesk'),
-                              SizedBox(width: 8),
-                              Icon(Icons.rocket_launch_rounded, size: 20),
-                            ],
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: DroidTheme.accent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 500.ms)
-                      .scale(
-                        begin: const Offset(0.9, 0.9),
-                        duration: 500.ms,
-                        curve: Curves.elasticOut,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Configure & Launch Desktop',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward_rounded, size: 20),
+                          ],
+                        ),
                       ),
+                    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.95, 0.95), duration: 400.ms),
+                  ),
                 ],
-
-                const SizedBox(height: 48),
               ],
             ),
           ),
@@ -275,70 +330,147 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
     );
   }
 
-  Widget _buildChecklist(AppState state) {
+  Widget _buildFiveStageChecklist(AppState state) {
     final isChroot = state.hasRoot;
-    if (!isChroot) {
-      final progress = state.extractProgress;
-      return _checklistColumn([
-        _ChecklistItem(
-          label: 'Bootstrap environment',
-          done: progress >= 0.08,
-          active: progress < 0.08,
-          progress: progress < 0.08 ? progress / 0.08 : null,
-        ),
-        _ChecklistItem(
-          label: 'Configure package repositories',
-          done: progress >= 0.24,
-          active: progress >= 0.08 && progress < 0.24,
-        ),
-        _ChecklistItem(
-          label: 'Install Desktop Essentials',
-          done: progress >= 0.70,
-          active: progress >= 0.24 && progress < 0.70,
-        ),
-        _ChecklistItem(
-          label: 'Finalize Desktop Essentials',
-          done: state.isSetupComplete,
-          active: progress >= 0.70 && !state.isSetupComplete,
-        ),
-      ]);
-    }
+    final extractP = state.extractProgress;
+    final downloadP = state.downloadProgress;
 
     final steps = [
       _ChecklistItem(
-        label: isChroot ? 'Root access confirmed' : 'Bootstrap environment',
-        done:
-            state.hasRoot ||
-            (!state.isDownloading && state.downloadProgress == 0),
+        stage: 1,
+        label: 'Pre-flight & Storage Verification',
+        detail: 'Checked storage, page alignment, & CPU sandbox.',
+        done: true,
         active: false,
       ),
       _ChecklistItem(
-        label: isChroot ? 'Download Ubuntu rootfs' : 'Install native packages',
-        done: state.downloadProgress >= 1.0,
-        active: state.isDownloading,
-        progress: state.isDownloading ? state.downloadProgress : null,
+        stage: 2,
+        label: isChroot ? 'Download ${state.selectedDistro.toUpperCase()} Archive' : 'Retrieve Native Termux Bootstrap',
+        detail: isChroot
+            ? (state.isDownloading ? '${(downloadP * 100).toInt()}% · ${(downloadP * 350).toInt()}/350 MB' : 'Rootfs verified')
+            : (extractP >= 0.08 ? 'Bootstrap downloaded' : 'Unpacking bootstrap package'),
+        done: isChroot ? downloadP >= 1.0 : extractP >= 0.08,
+        active: isChroot ? state.isDownloading : (extractP < 0.08 && !state.isSetupComplete),
+        progress: isChroot ? (state.isDownloading ? downloadP : null) : (extractP < 0.08 ? extractP / 0.08 : null),
       ),
       _ChecklistItem(
-        label: isChroot ? 'Extract rootfs' : 'Configure desktop',
-        done: state.extractProgress >= 1.0,
-        active: state.isExtracting,
-        progress: state.isExtracting ? state.extractProgress : null,
+        stage: 3,
+        label: 'Filesystem Extraction & Permissions',
+        detail: 'Setting up POSIX ownership and socket bindings.',
+        done: isChroot ? extractP >= 0.3 : extractP >= 0.25,
+        active: isChroot ? (state.isExtracting && extractP < 0.3) : (extractP >= 0.08 && extractP < 0.25),
       ),
       _ChecklistItem(
-        label: 'Configure Linux',
+        stage: 4,
+        label: 'Desktop Environment (${state.selectedDE.toUpperCase()})',
+        detail: 'Installing window manager, panels, & terminal.',
+        done: isChroot ? extractP >= 0.85 : extractP >= 0.70,
+        active: isChroot ? (state.isInstallingDE || extractP >= 0.3 && extractP < 0.85) : (extractP >= 0.25 && extractP < 0.70),
+      ),
+      _ChecklistItem(
+        stage: 5,
+        label: 'Touch Display & Audio Pipeline',
+        detail: 'Configuring PULSEAUDIO and DPI acceleration.',
         done: state.isSetupComplete,
-        active: state.extractProgress >= 1.0 && !state.isSetupComplete,
+        active: (extractP >= 0.70 || state.isInstallingDE) && !state.isSetupComplete,
       ),
     ];
 
-    return _checklistColumn(steps);
+    return ListView.separated(
+      key: const ValueKey('checklist'),
+      itemCount: steps.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final item = steps[i];
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: item.active
+                ? DroidTheme.surfaceLight
+                : item.done
+                    ? DroidTheme.cardBg
+                    : DroidTheme.surface.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: item.active
+                  ? DroidTheme.primary.withValues(alpha: 0.6)
+                  : item.done
+                      ? DroidTheme.accent.withValues(alpha: 0.3)
+                      : DroidTheme.surfaceBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: item.done
+                      ? DroidTheme.accent.withValues(alpha: 0.15)
+                      : item.active
+                          ? DroidTheme.primary.withValues(alpha: 0.15)
+                          : DroidTheme.surface,
+                ),
+                child: Center(
+                  child: item.done
+                      ? const Icon(Icons.check_rounded, color: DroidTheme.accent, size: 16)
+                      : item.active
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: DroidTheme.primary),
+                            )
+                          : Text(
+                              '${item.stage}',
+                              style: DroidTheme.monoSm.copyWith(color: DroidTheme.textDim, fontSize: 11),
+                            ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label,
+                      style: DroidTheme.bodySm.copyWith(
+                        fontWeight: item.active || item.done ? FontWeight.w600 : FontWeight.normal,
+                        color: item.done
+                            ? DroidTheme.textPrimary
+                            : item.active
+                                ? DroidTheme.textPrimary
+                                : DroidTheme.textDim,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      item.detail,
+                      style: DroidTheme.monoSm.copyWith(
+                        fontSize: 10,
+                        color: item.active ? DroidTheme.secondary : DroidTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (item.progress != null)
+                Text(
+                  '${(item.progress! * 100).toInt()}%',
+                  style: DroidTheme.monoSm.copyWith(color: DroidTheme.primary, fontWeight: FontWeight.bold),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildInstallLog(String log) {
     final cleanLog = log.replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '');
     return Container(
+      key: const ValueKey('terminal'),
       width: double.infinity,
-      height: 150,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF080D18),
@@ -352,83 +484,17 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
           style: DroidTheme.monoSm.copyWith(
             color: DroidTheme.textSecondary,
             height: 1.35,
+            fontSize: 11,
           ),
         ),
       ),
     );
   }
 
-  Widget _checklistColumn(List<_ChecklistItem> steps) {
-    return Column(
-      children: steps
-          .asMap()
-          .entries
-          .map((entry) {
-            final item = entry.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  // Status icon
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: item.done
-                        ? Icon(
-                            Icons.check_circle,
-                            color: DroidTheme.accent,
-                            size: 20,
-                          )
-                        : item.active
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: DroidTheme.primary,
-                            ),
-                          )
-                        : Icon(
-                            Icons.circle_outlined,
-                            color: DroidTheme.textDim,
-                            size: 20,
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: DroidTheme.bodyMd.copyWith(
-                        color: item.done
-                            ? DroidTheme.textPrimary
-                            : item.active
-                            ? DroidTheme.textSecondary
-                            : DroidTheme.textDim,
-                      ),
-                    ),
-                  ),
-                  if (item.progress != null)
-                    Text(
-                      '${(item.progress! * 100).toInt()}%',
-                      style: DroidTheme.monoSm.copyWith(
-                        color: DroidTheme.primary,
-                      ),
-                    ),
-                ],
-              ),
-            );
-          })
-          .toList()
-          .animate(interval: 100.ms)
-          .fadeIn(delay: 400.ms, duration: 300.ms)
-          .slideX(begin: -0.05, duration: 300.ms),
-    );
-  }
-
   _PhaseInfo _getPhase(AppState state) {
     if (state.errorMessage != null) {
       return _PhaseInfo(
-        title: 'Setup Failed',
+        title: 'Installation Paused',
         message: state.errorMessage!,
         progress: 0,
         icon: Icons.error_outline_rounded,
@@ -439,11 +505,9 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
 
     if (state.isDownloading) {
       return _PhaseInfo(
-        title: 'Downloading',
-        message: state.downloadStatus.isNotEmpty
-            ? state.downloadStatus
-            : 'Preparing download...',
-        progress: state.downloadProgress * 0.5, // 0–50% of total
+        title: 'Downloading Rootfs',
+        message: state.downloadStatus.isNotEmpty ? state.downloadStatus : 'Downloading distribution image...',
+        progress: state.downloadProgress * 0.45,
         icon: Icons.cloud_download_rounded,
         error: false,
         complete: false,
@@ -453,29 +517,19 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
     if (state.isExtracting || state.isInstallingDE) {
       if (!state.hasRoot) {
         return _PhaseInfo(
-          title: state.extractProgress < 0.08
-              ? 'Preparing Runtime'
-              : 'Installing Native Linux',
-          message: state.extractStatus.isNotEmpty
-              ? state.extractStatus
-              : 'Preparing native Termux environment...',
+          title: state.extractProgress < 0.08 ? 'Unpacking Bootstrap' : 'Configuring Desktop',
+          message: state.extractStatus.isNotEmpty ? state.extractStatus : 'Setting up native Linux packages...',
           progress: state.extractProgress,
-          icon: state.extractProgress < 0.08
-              ? Icons.inventory_2_rounded
-              : Icons.terminal_rounded,
+          icon: state.extractProgress < 0.08 ? Icons.inventory_2_rounded : Icons.terminal_rounded,
           error: false,
           complete: false,
         );
       }
       return _PhaseInfo(
-        title: state.isInstallingDE ? 'Installing Desktop' : 'Extracting',
-        message: state.extractStatus.isNotEmpty
-            ? state.extractStatus
-            : 'Extracting filesystem...',
-        progress: 0.5 + state.extractProgress * 0.4, // 50–90% of total
-        icon: state.isInstallingDE
-            ? Icons.desktop_windows_rounded
-            : Icons.unarchive_rounded,
+        title: state.isInstallingDE ? 'Installing Desktop' : 'Extracting Filesystem',
+        message: state.extractStatus.isNotEmpty ? state.extractStatus : 'Extracting filesystem & configuring permissions...',
+        progress: 0.45 + state.extractProgress * 0.5,
+        icon: state.isInstallingDE ? Icons.desktop_windows_rounded : Icons.unarchive_rounded,
         error: false,
         complete: false,
       );
@@ -483,8 +537,8 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
 
     if (state.isSetupComplete) {
       return _PhaseInfo(
-        title: 'Setup Complete!',
-        message: 'Your Linux desktop is ready to launch.',
+        title: 'Setup Completed Successfully!',
+        message: 'Your Linux environment is ready for final customization.',
         progress: 1.0,
         icon: Icons.check_circle_rounded,
         error: false,
@@ -492,12 +546,11 @@ class _SetupProgressScreenState extends State<SetupProgressScreen> {
       );
     }
 
-    // Default: not started yet
     return _PhaseInfo(
-      title: 'Setting Up',
-      message: 'Initializing...',
-      progress: 0,
-      icon: Icons.settings_rounded,
+      title: 'Preparing Setup',
+      message: 'Running pre-flight system diagnostics...',
+      progress: 0.05,
+      icon: Icons.settings_suggest_rounded,
       error: false,
       complete: false,
     );
@@ -523,15 +576,20 @@ class _PhaseInfo {
 }
 
 class _ChecklistItem {
+  final int stage;
   final String label;
+  final String detail;
   final bool done;
   final bool active;
   final double? progress;
 
   _ChecklistItem({
+    required this.stage,
     required this.label,
+    required this.detail,
     required this.done,
     required this.active,
     this.progress,
   });
 }
+

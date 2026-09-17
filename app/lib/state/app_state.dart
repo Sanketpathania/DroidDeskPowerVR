@@ -13,9 +13,16 @@ class AppState extends ChangeNotifier {
   String _selectedDE = 'xfce4';
   int _setupStep = 0; // 0=welcome, 1=distro, 2=de, 3=install, 4=done
 
-  // ── Download/Install Progress ──
+  // ── Post Setup Preferences ──
+  String _postSetupScale = '150%';
+  String _postSetupTouchMode = 'trackpad';
+  final Set<String> _queuedStarterApps = {};
+
+  // ── Download/Install Progress & Metrics ──
   double _downloadProgress = 0.0;
   String _downloadStatus = '';
+  double _downloadSpeedMBs = 0.0;
+  DateTime? _downloadStartTime;
   double _extractProgress = 0.0;
   String _extractStatus = '';
   bool _isDownloading = false;
@@ -53,6 +60,7 @@ class AppState extends ChangeNotifier {
   int get setupStep => _setupStep;
   double get downloadProgress => _downloadProgress;
   String get downloadStatus => _downloadStatus;
+  double get downloadSpeedMBs => _downloadSpeedMBs;
   double get extractProgress => _extractProgress;
   String get extractStatus => _extractStatus;
   String? get statusMessage => _statusMessage;
@@ -68,6 +76,9 @@ class AppState extends ChangeNotifier {
   String get optionalInstallStatus => _optionalInstallStatus;
   String get optionalInstallLog => _optionalInstallLog;
   bool get isProotTerminal => _isProotTerminal;
+  String get postSetupScale => _postSetupScale;
+  String get postSetupTouchMode => _postSetupTouchMode;
+  Set<String> get queuedStarterApps => _queuedStarterApps;
 
   bool get isSetupComplete => _isBootstrapped && _installedDE.isNotEmpty;
   bool get isDEInstalled => _installedDE.isNotEmpty;
@@ -140,6 +151,18 @@ class AppState extends ChangeNotifier {
   Future<void> initialize() async {
     // Set up progress callbacks
     DroidDeskPlatform.onDownloadProgress = (progress, status) {
+      if (_downloadStartTime == null || progress <= 0.01) {
+        _downloadStartTime = DateTime.now();
+      } else {
+        final elapsedSec = DateTime.now().difference(_downloadStartTime!).inMilliseconds / 1000.0;
+        if (elapsedSec > 0.5) {
+          // Approximate based on ~350MB rootfs
+          final totalEstMB = _selectedDistro == 'alpine' ? 5.0 : (_selectedDistro == 'kali' ? 520.0 : 350.0);
+          final downloadedMB = progress * totalEstMB;
+          _downloadSpeedMBs = downloadedMB / elapsedSec;
+        }
+      }
+
       _downloadProgress = progress;
       _downloadStatus = status;
       if (progress < 0) {
@@ -147,6 +170,7 @@ class AppState extends ChangeNotifier {
         _errorMessage = status;
       } else if (progress >= 1.0) {
         _isDownloading = false;
+        _downloadSpeedMBs = 0.0;
       }
       notifyListeners();
     };
@@ -361,6 +385,70 @@ class AppState extends ChangeNotifier {
     _isInstallingDE = false;
 
     await refreshStatus();
+  }
+
+  // ── Post Setup Configuration ──
+
+  void setPostSetupScale(String scale) {
+    _postSetupScale = scale;
+    notifyListeners();
+  }
+
+  void setPostSetupTouchMode(String touchMode) {
+    _postSetupTouchMode = touchMode;
+    notifyListeners();
+  }
+
+  void toggleQueuedStarterApp(String appId) {
+    if (_queuedStarterApps.contains(appId)) {
+      _queuedStarterApps.remove(appId);
+    } else {
+      _queuedStarterApps.add(appId);
+    }
+    notifyListeners();
+  }
+
+  /// Reset the entire rootfs installation to a clean state.
+  Future<bool> resetInstallation() async {
+    try {
+      _errorMessage = null;
+      _statusMessage = 'Resetting installation...';
+      notifyListeners();
+      final success = await DroidDeskPlatform.resetRootfs();
+      await refreshStatus();
+      return success;
+    } catch (e) {
+      _errorMessage = 'Reset failed: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Attempt to repair broken dpkg/apt packages and resume installation.
+  Future<void> repairAndRetry() async {
+    try {
+      _errorMessage = null;
+      _statusMessage = 'Repairing package locks and resuming...';
+      _isInstallingDE = true;
+      notifyListeners();
+
+      if (_hasRoot) {
+        final success = await DroidDeskPlatform.installDesktopEnvironment(_selectedDE);
+        if (!success) throw StateError('Desktop environment repair install failed.');
+      } else {
+        final success = await DroidDeskPlatform.installDesktopNative(de: _selectedDE);
+        if (!success) throw StateError('Native packages repair install failed.');
+      }
+
+      _isExtracting = false;
+      _isInstallingDE = false;
+      await refreshStatus();
+    } catch (e) {
+      _errorMessage = 'Repair failed: $e';
+      _isExtracting = false;
+      _isInstallingDE = false;
+      notifyListeners();
+    }
   }
 
   Future<void> runExtraction() async {
