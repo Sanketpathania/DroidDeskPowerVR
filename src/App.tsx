@@ -135,7 +135,7 @@ export default function App() {
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
     '[*] DroidDesk Linux Subsystem v0.1.0 (Pixel 10 Pro XL Edition)',
     '[*] Hardware: Google Tensor G5 ("Laguna") · 8 Cores (1x X925 + 5x A725 + 2x A520)',
-    '[*] GPU: Imagination Technologies PowerVR IMG DXT-72-2304',
+    '[*] GPU: Imagination Technologies PowerVR IMG DXT-48-1536 (No Ray Tracing)',
     '[*] Acceleration: Zink Gallium translation layer over Vulkan 1.3 ICD',
     '[*] Display: 1344 x 2992 Super Actua LTPO OLED · 120Hz · Scale: 200%',
     '[*] Profile: ZINK_DESCRIPTORS=lazy MESA_VK_WSI_PRESENT_MODE=immediate LP_NUM_THREADS=8',
@@ -191,13 +191,13 @@ export default function App() {
         '                       Icons: Papirus-Dark [GTK2/3]',
         '                       Terminal: xfce4-terminal',
         '                       CPU: Google Tensor G5 (8 cores: 1x 3.4GHz, 5x 2.8GHz, 2x 2.1GHz)',
-        '                       GPU: Imagination PowerVR IMG DXT-72-2304 (Zink HW Accel)',
+        '                       GPU: Imagination PowerVR IMG DXT-48-1536 (Zink HW Accel, No RT)',
         '                       Memory: 3840MiB / 16384MiB'
       );
     } else if (cmd === 'glxinfo' || cmd === 'glxinfo | grep -i opengl') {
       newHistory.push(
         'OpenGL vendor string: Mesa/Zink',
-        'OpenGL renderer string: zink (PowerVR IMG DXT-72-2304)',
+        'OpenGL renderer string: zink (PowerVR IMG DXT-48-1536)',
         'OpenGL core profile version string: 4.6 (Core Profile) Mesa 24.2.8',
         'OpenGL core profile shading language version string: 4.60',
         'OpenGL ES profile version string: OpenGL ES 3.2 Mesa 24.2.8',
@@ -208,12 +208,13 @@ export default function App() {
       newHistory.push(
         'Vulkan Instance Version: 1.3.280',
         'Active ICD: /vendor/etc/vulkan/icd.d/powervr_icd.json',
-        'GPU id : 0 (PowerVR IMG DXT-72-2304)',
+        'GPU id : 0 (PowerVR IMG DXT-48-1536)',
         '  Device Type     : PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU',
-        '  Driver Version  : 24.1.0-img-dxt',
+        '  Driver Version  : 24.1.0-img-dxt48',
         '  API Version     : 1.3.280',
         '  Subgroup Size   : 32',
-        '  Ray Tracing HW  : Supported (DXT Ray Tracing Unit)',
+        '  ALU Pipelines   : 48 (1536 FP32 FLOPs/clock)',
+        '  Ray Tracing HW  : Not Included (DXT-48 Raster & Compute Focus)',
         '  TBDR Tile Size  : 32x32 pixels'
       );
     } else if (cmd === 'htop') {
@@ -389,20 +390,20 @@ export default function App() {
                     <Sparkles className="w-4 h-4" /> Pixel 10 Pro XL · Dedicated PowerVR Acceleration
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                    Imagination PowerVR IMG DXT-72-2304
+                    Imagination PowerVR IMG DXT-48-1536
                   </h2>
                   <p className="text-neutral-300 text-sm mt-1 max-w-2xl leading-relaxed">
-                    Configured with custom Zink (OpenGL 4.6 over Vulkan 1.3) pipeline, TBDR lazy descriptor caching, 8-thread Tensor G5 CPU fallback, and high-DPI scaling for the 120Hz Super Actua display.
+                    Configured for Pixel 10 Pro XL (Tensor G5 Laguna) featuring 48 ALU pipelines (1536 FP32 FLOPs/clock) without ray tracing overhead. Optimized for low-power sustained TBDR rasterization via Zink (OpenGL 4.6 over Vulkan 1.3).
                   </p>
                   <div className="flex flex-wrap gap-2 mt-4">
                     <span className="px-3 py-1 rounded-md text-xs font-medium bg-cyan-950/60 text-cyan-300 border border-cyan-800/60">
                       Zink + Vulkan 1.3
                     </span>
                     <span className="px-3 py-1 rounded-md text-xs font-medium bg-purple-950/60 text-purple-300 border border-purple-800/60">
-                      TBDR Lazy Descriptors
+                      DXT-48 (No Ray Tracing)
                     </span>
                     <span className="px-3 py-1 rounded-md text-xs font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
-                      8-Core Fallback (Tensor G5)
+                      TBDR Lazy Descriptors
                     </span>
                     <span className="px-3 py-1 rounded-md text-xs font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60">
                       120Hz Super Actua (200% Scale)
@@ -613,7 +614,7 @@ export default function App() {
                     </div>
                     <div className="space-y-1">
                       <p className="text-emerald-400">$ glxinfo -B | grep "OpenGL renderer"</p>
-                      <p className="text-white">OpenGL renderer string: zink (PowerVR IMG DXT-72-2304)</p>
+                      <p className="text-white">OpenGL renderer string: zink (PowerVR IMG DXT-48-1536)</p>
                       <p className="text-emerald-400">$ echo $ZINK_DESCRIPTORS</p>
                       <p className="text-cyan-300">lazy</p>
                       <p className="text-neutral-500 animate-pulse">droiddesk@pixel10-pro-xl:~$ _</p>
@@ -739,6 +740,29 @@ export default function App() {
                 <p className="text-sm text-neutral-400 mt-1">
                   Fine-tune environmental variables, Vulkan translation parameters, and CPU fallback rasterization threads.
                 </p>
+              </div>
+
+              {/* Pixel 10 DXT-48 Silicon Architecture Callout */}
+              <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">Pixel 10 / Tensor G5 ("Laguna") GPU Architecture</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono font-semibold">
+                      PowerVR IMG DXT-48-1536
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    Tensor G5 incorporates the <strong>PowerVR DXT-48</strong> core configuration without hardware ray tracing. Silicon is prioritized for peak rasterization power-efficiency and sustained desktop rendering across 48 ALU pipelines (1,536 FP32 FLOPs/clock).
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-neutral-300 font-mono">
+                    RT: Not Included
+                  </span>
+                  <span className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono">
+                    48 ALUs / 1536 FLOPs
+                  </span>
+                </div>
               </div>
 
               {/* Tuning Options List */}

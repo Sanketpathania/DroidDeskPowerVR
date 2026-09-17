@@ -617,7 +617,7 @@ class MainActivity : FlutterActivity() {
                 vendor = "Imagination Technologies"
             }
             if (renderer == "unknown" || renderer.isEmpty()) {
-                renderer = "PowerVR IMG DXT-72-2304 (Tensor G5)"
+                renderer = "PowerVR IMG DXT-48-1536 (Tensor G5)"
             }
         }
 
