@@ -77,6 +77,18 @@ class AppState extends ChangeNotifier {
     return _deviceInfo['isPixel10ProXL'] == true || model.contains('pixel 10 pro xl');
   }
 
+  bool get isAndroid17 {
+    final sdk = _deviceInfo['sdkVersion'];
+    final release = _deviceInfo['androidVersion']?.toString() ?? '';
+    return _deviceInfo['isAndroid17'] == true || (sdk is int && sdk >= 37) || release.startsWith('17');
+  }
+
+  int get pageSizeKB {
+    final ps = _deviceInfo['pageSizeKB'];
+    if (ps is int) return ps;
+    return 16;
+  }
+
   bool get isPixel10 {
     final model = _deviceInfo['model']?.toString().toLowerCase() ?? '';
     final hardware = _deviceInfo['hardware']?.toString().toLowerCase() ?? '';

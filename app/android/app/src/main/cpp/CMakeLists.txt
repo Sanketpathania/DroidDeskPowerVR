@@ -9,6 +9,9 @@ add_library(
     compositor_jni.cpp
 )
 
+# 16 KB page alignment for Android 15, Android 16, and Android 17 (API 35-37+) compatibility
+target_link_options(droiddesk_compositor PRIVATE "-Wl,-z,max-page-size=16384")
+
 # Search for standard Android libraries
 find_library(log-lib log)
 find_library(android-lib android)

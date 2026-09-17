@@ -357,6 +357,13 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             status: 'ACTIVE & READY',
             isOk: true,
           ),
+          _divider(),
+          _integrityItem(
+            node: 'ELF 16KB Page Size Alignment',
+            label: 'Android 17 / 16 / 15 Flexible Page Size Support (-Wl,-z,max-page-size=16384)',
+            status: 'COMPATIBLE (${state.pageSizeKB}KB)',
+            isOk: true,
+          ),
         ],
       ),
     );

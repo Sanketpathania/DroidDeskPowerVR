@@ -158,12 +158,17 @@ class MainActivity : FlutterActivity() {
                     val isPvr = isPowerVrGpu()
                     val isP10 = isPixel10Device()
                     val isP10ProXL = Build.MODEL.contains("Pixel 10 Pro XL", ignoreCase = true)
+                    val pageSizeKb = getSystemPageSizeKb()
+                    val sdkInt = Build.VERSION.SDK_INT
+                    val isAndroid17 = sdkInt >= 37 || Build.VERSION.RELEASE.startsWith("17")
                     result.success(mapOf(
                         "model" to Build.MODEL,
                         "brand" to Build.BRAND,
                         "androidVersion" to Build.VERSION.RELEASE,
-                        "sdkVersion" to Build.VERSION.SDK_INT,
-                        "cpuAbi" to Build.SUPPORTED_ABIS.firstOrNull(),
+                        "sdkVersion" to sdkInt,
+                        "isAndroid17" to isAndroid17,
+                        "pageSizeKB" to pageSizeKb,
+                        "cpuAbi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"),
                         "hardware" to Build.HARDWARE,
                         "board" to Build.BOARD,
                         "gpuVendor" to gpuVendor,
@@ -673,5 +678,14 @@ class MainActivity : FlutterActivity() {
     private fun getAvailableStorage(): Long {
         val stat = android.os.StatFs(filesDir.absolutePath)
         return stat.availableBytes / (1024 * 1024)
+    }
+
+    private fun getSystemPageSizeKb(): Int {
+        return try {
+            val pageSize = android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE)
+            if (pageSize > 0) (pageSize / 1024).toInt() else 4
+        } catch (_: Throwable) {
+            4
+        }
     }
 }

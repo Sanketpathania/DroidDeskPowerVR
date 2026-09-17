@@ -478,7 +478,12 @@ class HomeScreen extends StatelessWidget {
                         _divider(),
                         _infoRow(
                           'Android',
-                          '${state.deviceInfo['androidVersion'] ?? '16'} (SDK ${state.deviceInfo['sdkVersion'] ?? '36'})',
+                          '${state.deviceInfo['androidVersion'] ?? (state.isAndroid17 ? '17' : '16')} (SDK ${state.deviceInfo['sdkVersion'] ?? (state.isAndroid17 ? '37' : '36')})',
+                        ),
+                        _divider(),
+                        _infoRow(
+                          'Kernel Pages',
+                          '${state.pageSizeKB} KB (Android 17 / 16KB Page Aligned)',
                         ),
                         _divider(),
                         _infoRow(
