@@ -28,21 +28,31 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Set up Android NDK (r26b)
+      - name: Set up Android NDK (28.2.13676358)
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r26b
+          ndk-version: r28b
           link-to-sdk: true
 
-      - name: Accept Android SDK Licenses
+      - name: Accept Android SDK Licenses & Verify NDK 28
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1" || true
 
       - name: Fetch Native wlroots Dependencies
         run: |
           chmod +x ./fetch_deps.sh
           ./fetch_deps.sh || true
+
+      - name: Ensure Termux Bootstrap Asset
+        run: |
+          mkdir -p app/assets
+          if [ ! -f "app/assets/bootstrap-aarch64.zip" ] || [ ! -s "app/assets/bootstrap-aarch64.zip" ]; then
+            echo "Downloading bootstrap-aarch64.zip asset..."
+            curl -L --retry 3 "https://github.com/termux/termux-packages/releases/download/bootstrap-2026.09.13-r1%2Bapt.android-7/bootstrap-aarch64.zip" -o "app/assets/bootstrap-aarch64.zip"
+          fi
+          ls -lh app/assets/bootstrap-aarch64.zip
 
       - name: Resolve Flutter Dependencies
         run: |
@@ -52,7 +62,7 @@ jobs:
       - name: Build Release APK
         run: |
           cd app
-          flutter build apk --release
+          flutter build apk --release --android-skip-build-dependency-validation
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}

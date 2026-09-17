@@ -62,3 +62,14 @@ cd "$SCRIPT_DIR"
 rm -rf "$WORK_DIR"
 
 echo "Done fetching wlroots dependencies!"
+
+# Verify or download Termux bootstrap-aarch64.zip required by Flutter assets
+BOOTSTRAP_ZIP="$SCRIPT_DIR/app/assets/bootstrap-aarch64.zip"
+if [ ! -f "$BOOTSTRAP_ZIP" ] || [ ! -s "$BOOTSTRAP_ZIP" ]; then
+    echo "Fetching Termux bootstrap-aarch64.zip asset..."
+    mkdir -p "$SCRIPT_DIR/app/assets"
+    curl -L --retry 3 "https://github.com/termux/termux-packages/releases/download/bootstrap-2026.09.13-r1%2Bapt.android-7/bootstrap-aarch64.zip" -o "$BOOTSTRAP_ZIP"
+    echo "Termux bootstrap-aarch64.zip asset downloaded successfully."
+else
+    echo "Termux bootstrap-aarch64.zip asset is already present."
+fi
