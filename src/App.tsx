@@ -115,7 +115,7 @@ const INITIAL_PACKAGES: AppPackage[] = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'display' | 'powervr' | 'packages' | 'terminal' | 'diagnostics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'display' | 'powervr' | 'packages' | 'terminal' | 'diagnostics' | 'build'>('overview');
   const [isRunning, setIsRunning] = useState(true);
   const [selectedDE, setSelectedDE] = useState<'xfce4' | 'lxqt' | 'mate' | 'plasma'>('xfce4');
   const [resolutionMode, setResolutionMode] = useState<'200%' | '150%' | '100%' | '1080p'>('200%');
@@ -352,6 +352,7 @@ export default function App() {
             { id: 'packages', label: 'App Catalog', icon: FolderOpen },
             { id: 'terminal', label: 'Terminal Console', icon: Terminal },
             { id: 'diagnostics', label: 'Diagnostics & CPU', icon: Activity },
+            { id: 'build', label: 'APK Build & Export', icon: Download },
           ].map(tab => {
             const IconComponent = tab.icon;
             const active = activeTab === tab.id;
@@ -1106,6 +1107,136 @@ export default function App() {
                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: '44%' }} />
                   </div>
                   <p className="text-xs text-neutral-400">Rootfs location: /data/data/com.termux/files/usr/var/lib/proot-distro</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* APK BUILD & EXPORT TAB */}
+        {activeTab === 'build' && (
+          <div className="space-y-6">
+            {/* Header Banner */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-[#161729] via-[#121320] to-[#0c0d16] border border-cyan-500/30 space-y-3">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs font-semibold uppercase tracking-wider">
+                <Download className="w-4 h-4" /> Pixel 10 Pro XL · Android APK Build Pipeline
+              </div>
+              <h2 className="text-2xl font-bold text-white">Export & Build DroidDesk APK</h2>
+              <p className="text-sm text-neutral-300 max-w-3xl leading-relaxed">
+                Because AI Studio Cloud Run containers run in a lightweight Node.js web runtime without the 10GB+ Android SDK and NDK compilation tools pre-installed, we have configured an automated <strong>GitHub Actions CI workflow</strong> and a <strong>local build script</strong> to compile the release APK directly for your Pixel 10 Pro XL.
+              </p>
+            </div>
+
+            {/* Methods Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Option 1: Automated GitHub Actions Build */}
+              <div className="p-6 rounded-xl bg-[#141520] border border-white/10 flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm">
+                        1
+                      </div>
+                      <h3 className="font-bold text-white text-base">Automated GitHub Actions Build</h3>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-mono">
+                      Workflow Configured
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    A dedicated workflow file has been created at <code className="text-cyan-400 font-mono">.github/workflows/build-apk.yml</code>. Whenever code is pushed to your GitHub repository, GitHub's Ubuntu runners automatically compile the Flutter ARM64 APK with PowerVR support.
+                  </p>
+
+                  <div className="p-3.5 rounded-lg bg-black/40 border border-white/5 space-y-2 text-xs">
+                    <span className="text-neutral-400 font-semibold block">How to push & trigger:</span>
+                    <ol className="list-decimal list-inside space-y-1.5 text-neutral-300 pl-1">
+                      <li>Open the top-right <strong>Export</strong> or <strong>Settings</strong> menu in Google AI Studio.</li>
+                      <li>Select <strong>Export to GitHub</strong> to sync these changes directly to <code className="text-purple-300">Sanketpathania/DroidDeskPowerVR</code>.</li>
+                      <li>Visit your repository on GitHub and navigate to the <strong>Actions</strong> tab.</li>
+                      <li>The <strong className="text-white">Build DroidDesk PowerVR APK</strong> workflow will build the APK and generate the downloadable artifact: <code className="text-emerald-400">app-release.apk</code>.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between text-xs font-mono text-neutral-400">
+                  <span>Workflow File:</span>
+                  <span className="text-cyan-400">.github/workflows/build-apk.yml</span>
+                </div>
+              </div>
+
+              {/* Option 2: Local Machine Compilation */}
+              <div className="p-6 rounded-xl bg-[#141520] border border-white/10 flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm">
+                        2
+                      </div>
+                      <h3 className="font-bold text-white text-base">Compile Locally via Script</h3>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-xs font-mono">
+                      ./build-apk.sh
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    If you have Flutter and Android SDK installed on your computer, you can clone or download the ZIP and compile the release APK with one command.
+                  </p>
+
+                  <div className="p-3 rounded-lg bg-black/50 border border-white/10 font-mono text-xs space-y-1 text-neutral-300">
+                    <div className="text-neutral-500"># 1. Clone or download your repository</div>
+                    <div className="text-cyan-400">git clone https://github.com/Sanketpathania/DroidDeskPowerVR.git</div>
+                    <div className="text-cyan-400">cd DroidDeskPowerVR</div>
+                    <div className="text-neutral-500 mt-2"># 2. Run the automated build script</div>
+                    <div className="text-emerald-400">chmod +x build-apk.sh && ./build-apk.sh</div>
+                    <div className="text-neutral-500 mt-2"># Output APK will be at:</div>
+                    <div className="text-amber-300">app/build/app/outputs/flutter-apk/app-release.apk</div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between text-xs font-mono text-neutral-400">
+                  <span>Target ABI:</span>
+                  <span className="text-purple-300">arm64-v8a (Tensor G5 / PowerVR)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Changes Included in This Build */}
+            <div className="p-6 rounded-xl bg-[#141520] border border-white/5 space-y-4">
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" /> PowerVR & Pixel 10 Pro XL Changes Bundled in APK
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">LinuxRuntime.kt</div>
+                  <div className="text-neutral-400 mt-1">Zink driver injection, TBDR lazy descriptors, 8-thread Tensor G5 allocation</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">MainActivity.kt</div>
+                  <div className="text-neutral-400 mt-1">Pixel 10 Pro XL detection, PowerVR EGL probing, method channel reporting</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">ChrootRuntime.kt</div>
+                  <div className="text-neutral-400 mt-1">droiddesk-ha.sh hardware acceleration with PowerVR device node bindings</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">RootfsManager.kt</div>
+                  <div className="text-neutral-400 mt-1">Default environment profile with PVR_MESA=1 and LP_NUM_THREADS=8</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">X11InputController.kt</div>
+                  <div className="text-neutral-400 mt-1">High-DPI 200% display scaling for Pixel 10 Pro XL Super Actua display</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="font-semibold text-white">termux-linux-setup.sh</div>
+                  <div className="text-neutral-400 mt-1">PowerVR DXT detection, Vulkan loader generic, and kernel node passthrough</div>
                 </div>
               </div>
             </div>

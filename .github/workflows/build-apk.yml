@@ -1,0 +1,54 @@
+name: Build DroidDesk PowerVR APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Android APK (Pixel 10 Pro XL PowerVR)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK & NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK & CMake
+        run: |
+          sdkmanager --install "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Fetch Dependencies
+        run: |
+          ./fetch_deps.sh || true
+          cd app
+          flutter pub get
+
+      - name: Build Release APK
+        run: |
+          cd app
+          flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidDesk-Pixel10-PowerVR-APK
+          path: app/build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
